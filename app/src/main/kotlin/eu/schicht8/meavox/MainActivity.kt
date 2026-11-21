@@ -10,9 +10,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -35,6 +42,7 @@ import eu.schicht8.meavox.ui.models.ImportSheet
 import eu.schicht8.meavox.ui.search.SearchRoute
 import eu.schicht8.meavox.ui.session.SessionRoute
 import eu.schicht8.meavox.ui.settings.SettingsRoute
+import eu.schicht8.meavox.ui.splash.SplashAnimation
 import eu.schicht8.meavox.ui.storage.StorageRoute
 import eu.schicht8.meavox.ui.theme.MeaVoxTheme
 
@@ -48,6 +56,7 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
+        val showSplash = savedInstanceState == null && intent?.action != Intent.ACTION_SEND
         if (savedInstanceState == null) handleShare(intent)
         setContent {
             MeaVoxTheme {
@@ -121,6 +130,12 @@ class MainActivity : ComponentActivity() {
                         val id = TrackId(SourceId(checkNotNull(args.getString("source"))), checkNotNull(args.getString("id")))
                         LyricsSearchRoute(id, container.matchLyrics, onChosen = { nav.popBackStack() })
                     }
+                }
+                // Cold start only, not for a song shared into MeaVox: the waveform that curls into
+                // the wordmark, over the library while it loads. A tap skips it.
+                var splash by rememberSaveable { mutableStateOf(showSplash) }
+                AnimatedVisibility(splash, enter = EnterTransition.None, exit = fadeOut(tween(300))) {
+                    SplashAnimation(onFinished = { splash = false })
                 }
             }
         }

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeaVox Splash-Vorschau</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a studio test bench for one 3-second motion piece; calm, technical, dark like the app.
+   IDEA: an oscilloscope bench: the phone is the scope screen, controls sit below like knobs.
+   PICTURE: the live splash animation in a phone frame, large, first thing on screen.
+   COLOUR and TYPE: MeaVox black #09090B, gold #E8B93E, cool greys from the icon; Montserrat + Inter.
+   LAYOUT: phone left, controls and timeline right; stacked below 760px. */
+:root{color-scheme:dark;--bg:#09090B;--panel:#141417;--line:#3A3B40;--ink:#E3E5E8;--muted:#A3A8AF;--gold:#E8B93E;--gold-deep:#C8941F}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(24px,4vw,56px) max(5vw,16px);max-width:1240px;margin:0 auto}
+h1{font:800 clamp(28px,4.2vw,44px)/1.05 Montserrat,sans-serif;margin:0 0 8px;text-wrap:balance}
+.lede{color:var(--muted);margin:0 0 28px;max-width:62ch}
+.bench{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:clamp(24px,4vw,56px);align-items:start}
+.phone{position:relative;aspect-ratio:9/19.5;border-radius:38px;background:#000;padding:10px;box-shadow:0 0 0 1.5px var(--line),0 30px 80px -30px rgba(232,185,62,.25)}
+.phone canvas{display:block;width:100%;height:100%;border-radius:30px;background:var(--bg)}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px}
+button{font:500 15px Inter,sans-serif;min-height:44px;padding:0 18px;border-radius:22px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button[aria-pressed=true]{background:var(--gold);color:#141109;border-color:var(--gold)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.scrub{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin-bottom:26px}
+input[type=range]{width:100%;accent-color:var(--gold);height:44px}
+.time{font:500 15px Inter,sans-serif;font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+h2{font:600 20px/1.2 Montserrat,sans-serif;margin:0 0 12px}
+.phases{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.phases li{display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.phases b{font-weight:500;font-variant-numeric:tabular-nums;color:var(--gold);white-space:nowrap}
+.phases li.on b{color:#141109;background:var(--gold);border-radius:6px;padding:0 6px;justify-self:start}
+.phases span{color:var(--muted)}
+.phases strong{color:var(--ink);font-weight:500}
+.note{color:var(--muted);font-size:14px;margin-top:18px}
+@media(max-width:760px){.bench{grid-template-columns:minmax(0,1fr)}.phone{max-width:300px;margin:0 auto}}
+</style>
+</head>
+<body>
+<main class="band">
+  <h1>MeaVox Splash: Stimme wird Logo</h1>
+  <p class="lede">Eine gesungene Wellenform läuft wie auf einem Oszilloskop und rollt sich dann Stück für Stück in die Buchstaben ein. Gleicher Algorithmus wie die Compose-Umsetzung in der App.</p>
+  <div class="bench">
+    <div class="phone"><canvas id="cv" aria-label="Splash-Animation"></canvas></div>
+    <div>
+      <div class="ctrl">
+        <button id="play">Abspielen</button>
+        <button data-speed="1" aria-pressed="true">1×</button>
+        <button data-speed="0.5" aria-pressed="false">0,5×</button>
+        <button data-speed="0.25" aria-pressed="false">0,25×</button>
+        <button id="loop" aria-pressed="true">Schleife</button>
+      </div>
+      <div class="scrub">
+        <input id="t" type="range" min="0" max="3.2" step="0.01" value="0" aria-label="Zeitpunkt">
+        <span class="time" id="tl">0,00 s</span>
+      </div>
+      <h2>Ablauf (3,2 s)</h2>
+      <ul class="phases" id="phases">
+        <li data-a="0" data-b="1.15"><b>0,00–1,15 s</b><span><strong>Stimme.</strong> Goldene Spur mit Nachleuchten auf Raster; Grundton mit Vibrato, die Obertöne wandern zwischen zwei Vokalen.</span></li>
+        <li data-a="1.15" data-b="2.25"><b>1,15–2,25 s</b><span><strong>Morph.</strong> Die Spur zerfällt in neun Stücke, eines je Buchstabenkontur; sie rollen sich von links nach rechts versetzt ein, während die Stimme weiterschwingt.</span></li>
+        <li data-a="2.15" data-b="2.65"><b>2,15–2,65 s</b><span><strong>Füllung.</strong> Rand und „Vox“ gehen in den metallischen Goldverlauf über, das Raster ist ausgeblendet.</span></li>
+        <li data-a="2.35" data-b="3.0"><b>2,35–3,00 s</b><span><strong>Glanz.</strong> Ein Lichtstreif läuft einmal über das Gold.</span></li>
+        <li data-a="3.0" data-b="3.21"><b>3,00–3,20 s</b><span><strong>Stand.</strong> Fertiges Logo, danach blendet die App zum Inhalt über.</span></li>
+      </ul>
+      <p class="note">Mit dem Regler lässt sich jedes Einzelbild ansehen. Bei „Bewegung reduzieren“ zeigt die App direkt das fertige Logo.</p>
+    </div>
+  </div>
+</main>
+<script>
+{
+const DATA = {"bounds":[7.0,-70.0,441.3,0.9],"stroke":3.4,"contours":[{"part":"mea","d":"M7 0V-70H23.3L47.9 -29.5L71.9 -70H88.2L88.4 0H70.2L70 -37.1L52 -6.9H43.2L25.3 -36.1V0Z"},{"part":"mea","d":"M133.9 0.9Q124.3 0.9 117.15 -2.75Q110 -6.4 106.05 -12.75Q102.1 -19.1 102.1 -27.2Q102.1 -35.3 105.95 -41.65Q109.8 -48 116.6 -51.55Q123.4 -55.1 131.9 -55.1Q139.9 -55.1 146.5 -51.85Q153.1 -48.6 157 -42.3Q160.9 -36 160.9 -27Q160.9 -26 160.8 -24.7Q160.7 -23.4 160.6 -22.3H121.2Q121.6 -20.9 122.4 -19.6Q124 -16.7 127.1 -15.15Q130.2 -13.6 134.5 -13.6Q138.5 -13.6 141.35 -14.75Q144.2 -15.9 147 -18.3L157 -7.9Q153.1 -3.6 147.4 -1.35Q141.7 0.9 133.9 0.9Z"},{"part":"mea","d":"M120.9 -32.3H143.1Q142.8 -34.3 141.9 -35.9Q140.5 -38.6 137.95 -40.1Q135.4 -41.6 132 -41.6Q128.6 -41.6 126.05 -40.1Q123.5 -38.6 122.1 -35.9Q121.3 -34.3 120.9 -32.3Z"},{"part":"mea","d":"M205.3 0V-6.9Q203.6 -3.8 200.8 -2Q196.4 0.9 189.3 0.9Q182.8 0.9 178.3 -1.3Q173.8 -3.5 171.45 -7.3Q169.1 -11.1 169.1 -15.8Q169.1 -20.8 171.65 -24.45Q174.2 -28.1 179.5 -30.05Q184.8 -32 193.2 -32H204Q203.7 -35.9 201.2 -38.1Q198.5 -40.6 192.5 -40.6Q188.6 -40.6 184.6 -39.35Q180.6 -38.1 177.8 -35.9L171.4 -48.8Q176 -51.8 182.45 -53.45Q188.9 -55.1 195.3 -55.1Q208.5 -55.1 215.75 -49.05Q223 -43 223 -30.1V0Z"},{"part":"mea","d":"M204 -22.1H195.8Q191.2 -22.1 189.35 -20.6Q187.5 -19.1 187.5 -16.6Q187.5 -14.1 189.4 -12.6Q191.3 -11.1 194.6 -11.1Q197.7 -11.1 200.25 -12.65Q202.8 -14.2 204 -17.4Z"},{"part":"vox","d":"M263.4 0 233.5 -70H254.9L273.9 -24.4L293.3 -70H312.9L282.9 0Z"},{"part":"vox","d":"M343.3 0.9Q334.4 0.9 327.5 -2.7Q320.6 -6.3 316.65 -12.65Q312.7 -19 312.7 -27.2Q312.7 -35.4 316.65 -41.7Q320.6 -48 327.5 -51.55Q334.4 -55.1 343.3 -55.1Q352.2 -55.1 359.15 -51.55Q366.1 -48 370 -41.7Q373.9 -35.4 373.9 -27.2Q373.9 -19 370 -12.65Q366.1 -6.3 359.15 -2.7Q352.2 0.9 343.3 0.9Z"},{"part":"vox","d":"M343.3 -14.2Q346.6 -14.2 349.15 -15.7Q351.7 -17.2 353.2 -20.15Q354.7 -23.1 354.7 -27.2Q354.7 -31.3 353.2 -34.15Q351.7 -37 349.15 -38.5Q346.6 -40 343.3 -40Q340.1 -40 337.55 -38.5Q335 -37 333.45 -34.15Q331.9 -31.3 331.9 -27.2Q331.9 -23.1 333.45 -20.15Q335 -17.2 337.55 -15.7Q340.1 -14.2 343.3 -14.2Z"},{"part":"vox","d":"M378.9 0 399.6 -27.1 379.5 -54.2H400.9L410.6 -40.5L420.5 -54.2H440.6L420.6 -27.8L441.3 0H419.6L409.9 -14.2L399.5 0Z"}]};
+const [LEFT, TOP, RIGHT, BOTTOM] = DATA.bounds, STROKE = DATA.stroke;
+const CX = (LEFT + RIGHT) / 2, CY = (TOP + BOTTOM) / 2;
+const GOLD = '#E8B93E', BLACK = '#09090B', TAU = Math.PI * 2;
+// Timeline in seconds (same constants as SplashAnimation.kt)
+const ATTACK = 0.35, MORPH_START = 1.15, MORPH_DUR = 0.75, STAGGER = 0.35;
+const LEAD_START = 1.0, LEAD_DUR = 0.6, FILL_START = 2.15, FILL_DUR = 0.5;
+const GLINT_START = 2.35, GLINT_DUR = 0.65, END = 3.2, AMP = 70, LOGO_WIDTH_FRACTION = 0.82;
+const GOLD_STOPS = [[0,'#F6D77A'],[.22,'#FFF4CC'],[.40,'#E8B93E'],[.53,'#9C6A12'],[.60,'#C8941F'],[.80,'#EBC14F'],[1,'#F9E3A0']];
+
+const clamp = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const easeInOut = v => v < .5 ? 4 * v * v * v : 1 - (-2 * v + 2) ** 3 / 2;
+const easeOut = v => 1 - (1 - v) ** 3;
+const smooth = (a, b, v) => { const x = clamp((v - a) / (b - a)); return x * x * (3 - 2 * x); };
+
+// A sung vowel: fundamental with vibrato, six harmonics blending between two vowel colours.
+const VA = [1, .55, .35, .5, .2, .12], VB = [1, .25, .6, .15, .3, .08], VP = [0, .7, 1.9, .4, 2.6, 1.2];
+function voice(xn, t) {
+  const cycles = 3.0 * (1 + 0.06 * Math.sin(TAU * 5.5 * t)) + 0.4 * Math.sin(TAU * 0.35 * t);
+  const ph = TAU * (xn * cycles - 0.9 * t);
+  const m = 0.5 + 0.5 * Math.sin(TAU * 0.7 * t + 1.0);
+  let s = 0;
+  for (let h = 0; h < 6; h++) s += (VA[h] * (1 - m) + VB[h] * m) * Math.sin((h + 1) * ph + VP[h]);
+  return s / 2;
+}
+const envelope = t => easeOut(clamp(t / ATTACK)) * (1 + 0.08 * Math.sin(TAU * 3.1 * t));
+const taper = xn => smooth(0, 0.06, xn) * smooth(1, 0.94, xn);
+
+// Sample each contour from its leftmost point, evenly by arc length; closed (last = first).
+const svgNS = 'http://www.w3.org/2000/svg';
+const svg = document.createElementNS(svgNS, 'svg');
+svg.style.cssText = 'position:absolute;width:0;height:0';
+document.body.appendChild(svg);
+const contours = DATA.contours.map(c => {
+  const el = document.createElementNS(svgNS, 'path');
+  el.setAttribute('d', c.d); svg.appendChild(el);
+  const L = el.getTotalLength();
+  let off = 0, best = Infinity, bestY = -Infinity;
+  for (let i = 0; i < 200; i++) {
+    const p = el.getPointAtLength(L * i / 200);
+    if (p.x < best - 1e-3 || (Math.abs(p.x - best) < 1e-3 && p.y > bestY)) { best = p.x; bestY = p.y; off = L * i / 200; }
+  }
+  const n = Math.max(24, Math.ceil(L / 0.6)), pts = new Float32Array((n + 1) * 2);
+  let minX = Infinity, maxX = -Infinity;
+  for (let i = 0; i <= n; i++) {
+    const p = el.getPointAtLength((off + L * i / n) % L);
+    pts[2 * i] = p.x; pts[2 * i + 1] = p.y;
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+  }
+  return { part: c.part, d: c.d, L, n, pts, minX, maxX };
+});
+svg.remove();
+contours.sort((a, b) => a.minX - b.minX || b.L - a.L);
+const total = contours.reduce((s, c) => s + c.L, 0);
+let acc = LEFT;
+for (const c of contours) {
+  c.sx0 = acc; acc += (RIGHT - LEFT) * c.L / total; c.sx1 = acc;
+  c.delay = MORPH_START + STAGGER * ((c.minX + c.maxX) / 2 - LEFT) / (RIGHT - LEFT);
+}
+const meaPath = new Path2D(DATA.contours.filter(c => c.part === 'mea').map(c => c.d).join(''));
+const voxPath = new Path2D(DATA.contours.filter(c => c.part === 'vox').map(c => c.d).join(''));
+
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, dpr = 1, s = 1, traceL = 0, traceR = 0;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  s = LOGO_WIDTH_FRACTION * W / (RIGHT - LEFT);
+  traceL = CX - (W / 2) / s; traceR = CX + (W / 2) / s;
+  draw(time);
+}
+const waveY = (x, t) => CY + AMP * envelope(t) * taper((x - traceL) / (traceR - traceL)) * voice((x - traceL) / (traceR - traceL), t);
+
+// One pass of the trace at time t: two leads outside the logo plus one piece per contour.
+function tracePath(t) {
+  const p = new Path2D();
+  const r = easeInOut(clamp((t - LEAD_START) / LEAD_DUR));
+  for (const [a, b] of [[traceL + (LEFT - traceL) * r, LEFT], [RIGHT, traceR - (traceR - RIGHT) * r]]) {
+    if (b - a < 0.5) continue;
+    const steps = Math.ceil((b - a) / 1.2);
+    for (let i = 0; i <= steps; i++) { const x = a + (b - a) * i / steps; i ? p.lineTo(x, waveY(x, t)) : p.moveTo(x, waveY(x, t)); }
+  }
+  for (const c of contours) {
+    const e = easeInOut(clamp((t - c.delay) / MORPH_DUR));
+    for (let i = 0; i <= c.n; i++) {
+      const sx = c.sx0 + (c.sx1 - c.sx0) * i / c.n;
+      const x = sx + (c.pts[2 * i] - sx) * e;
+      const y = (e < 1 ? waveY(sx, t) : 0) * (1 - e) + c.pts[2 * i + 1] * e;
+      i ? p.lineTo(x, y) : p.moveTo(x, y);
+    }
+  }
+  return p;
+}
+
+function goldGradient() {
+  const g = ctx.createLinearGradient(0, TOP - STROKE / 2, 0, BOTTOM + STROKE / 2);
+  for (const [o, col] of GOLD_STOPS) g.addColorStop(o, col);
+  return g;
+}
+
+function draw(t) {
+  if (!W) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = BLACK; ctx.fillRect(0, 0, W, H);
+  const oy = H * 0.46;
+  // Graticule in screen space
+  const grid = 1 - smooth(1.0, 1.9, t);
+  if (grid > 0) {
+    const div = W / 8;
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 8; i++) { ctx.strokeStyle = `rgba(163,168,175,${0.07 * grid})`; ctx.beginPath(); ctx.moveTo(i * div, oy - 3 * div); ctx.lineTo(i * div, oy + 3 * div); ctx.stroke(); }
+    for (let k = -3; k <= 3; k++) { ctx.strokeStyle = `rgba(163,168,175,${(k ? 0.07 : 0.16) * grid})`; ctx.beginPath(); ctx.moveTo(0, oy + k * div); ctx.lineTo(W, oy + k * div); ctx.stroke(); }
+  }
+  ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * (W / 2 - CX * s), dpr * (oy - CY * s));
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const intro = clamp(t / 0.15);
+  const fill = easeOut(clamp((t - FILL_START) / FILL_DUR));
+  const gold = goldGradient();
+  if (fill > 0) {
+    ctx.globalAlpha = fill; ctx.lineWidth = STROKE;
+    ctx.fillStyle = BLACK; ctx.fill(meaPath); ctx.strokeStyle = gold; ctx.stroke(meaPath);
+    ctx.fillStyle = gold; ctx.fill(voxPath); ctx.stroke(voxPath);
+  }
+  // Phosphor afterglow: two earlier traces, gone once the morph starts
+  const ghost = intro * (1 - smooth(MORPH_START - 0.1, MORPH_START + 0.3, t));
+  ctx.strokeStyle = GOLD; ctx.lineWidth = STROKE;
+  for (const [dt, a] of [[0.08, 0.12], [0.04, 0.22]]) {
+    if (ghost <= 0 || t - dt < 0) continue;
+    ctx.globalAlpha = a * ghost; ctx.stroke(tracePath(t - dt));
+  }
+  if (fill < 1) {
+    const p = tracePath(t);
+    ctx.globalAlpha = 0.22 * intro * (1 - fill); ctx.lineWidth = STROKE * 3.2; ctx.stroke(p);
+    ctx.globalAlpha = intro * (1 - fill); ctx.lineWidth = STROKE; ctx.stroke(p);
+  }
+  // Glint across the gold
+  const g = (t - GLINT_START) / GLINT_DUR;
+  if (g > 0 && g < 1) {
+    const bx = LEFT - 60 + (RIGHT - LEFT + 120) * easeInOut(g);
+    const lg = ctx.createLinearGradient(bx - 22, BOTTOM + 10, bx + 22, TOP - 10);
+    lg.addColorStop(0, 'rgba(255,250,230,0)'); lg.addColorStop(0.5, 'rgba(255,250,230,0.85)'); lg.addColorStop(1, 'rgba(255,250,230,0)');
+    ctx.globalAlpha = 1; ctx.lineWidth = STROKE;
+    ctx.strokeStyle = lg; ctx.stroke(meaPath);
+    ctx.fillStyle = lg; ctx.fill(voxPath); ctx.stroke(voxPath);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Player
+const range = document.getElementById('t'), tl = document.getElementById('tl'), playBtn = document.getElementById('play');
+const phases = [...document.querySelectorAll('#phases li')];
+let time = 0, speed = 1, playing = false, loop = true, last = 0, hold = 0;
+function show(t) {
+  time = t; range.value = t.toFixed(2); tl.textContent = t.toFixed(2).replace('.', ',') + ' s';
+  for (const li of phases) li.classList.toggle('on', t >= +li.dataset.a && t < +li.dataset.b);
+  draw(t);
+}
+function frame(now) {
+  if (!playing) return;
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (time >= END) {
+    hold += dt;
+    if (!loop) { playing = false; playBtn.textContent = 'Abspielen'; return; }
+    if (hold > 1.0) { hold = 0; show(0); }
+  } else show(Math.min(END, time + dt * speed));
+  requestAnimationFrame(frame);
+}
+function play() {
+  if (time >= END) show(0);
+  playing = true; hold = 0; last = performance.now(); playBtn.textContent = 'Pause';
+  requestAnimationFrame(frame);
+}
+playBtn.addEventListener('click', () => { if (playing) { playing = false; playBtn.textContent = 'Abspielen'; } else play(); });
+document.querySelectorAll('[data-speed]').forEach(b => b.addEventListener('click', () => {
+  speed = +b.dataset.speed;
+  document.querySelectorAll('[data-speed]').forEach(o => o.setAttribute('aria-pressed', o === b));
+}));
+const loopBtn = document.getElementById('loop');
+loopBtn.addEventListener('click', () => { loop = !loop; loopBtn.setAttribute('aria-pressed', loop); });
+range.addEventListener('input', () => { playing = false; playBtn.textContent = 'Abspielen'; show(+range.value); });
+const ro = new ResizeObserver(resize); ro.observe(cv);
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduce) show(END); else play();
+window.__seek = t => { playing = false; show(t); };
+}
+</script>
+</body>
+</html>
