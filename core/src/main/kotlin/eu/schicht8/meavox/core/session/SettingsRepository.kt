@@ -30,4 +30,10 @@ interface SettingsRepository {
     suspend fun notificationPermissionAsked(): Boolean
 
     suspend fun setNotificationPermissionAsked()
+
+    /** The singer's name, which Mix Exports are tagged with ("<artist> feat. <name>", #15); null until set. */
+    suspend fun singerName(): String?
+
+    /** Sets the singer's name; null or blank clears it. */
+    suspend fun setSingerName(name: String?)
 }

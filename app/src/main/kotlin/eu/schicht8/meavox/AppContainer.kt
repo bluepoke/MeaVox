@@ -39,7 +39,7 @@ import eu.schicht8.meavox.data.RoomMixRepository
 import eu.schicht8.meavox.data.RoomSettingsRepository
 import eu.schicht8.meavox.data.RoomTakeRepository
 import eu.schicht8.meavox.data.RoomTrackRepository
-import eu.schicht8.meavox.data.export.MediaStoreExports
+import eu.schicht8.meavox.export.MediaStoreExports
 import eu.schicht8.meavox.downloading.HttpMediaDownloader
 import eu.schicht8.meavox.engine.NativeOfflineRenderer
 import eu.schicht8.meavox.engine.OboeAudioEngine
@@ -92,7 +92,7 @@ class AppContainer(private val context: Context) {
     private val offlineRenderer by lazy { NativeOfflineRenderer() }
     private val exportStore by lazy { MediaStoreExports(context.contentResolver) }
     val exportMix: ExportMix by lazy {
-        ExportMix(trackRepository, takeRepository, mixRepository, trackFiles, offlineRenderer, exportStore)
+        ExportMix(trackRepository, takeRepository, mixRepository, trackFiles, offlineRenderer, exportStore, settingsRepository)
     }
 
     // Backing Export (#24).

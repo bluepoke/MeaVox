@@ -54,6 +54,11 @@ class RoomSettingsRepository(database: MeaVoxDatabase) : SettingsRepository {
 
     override suspend fun setNotificationPermissionAsked() = dao.put(SettingEntity(NOTIFICATION_PERMISSION_ASKED, true.toString()))
 
+    override suspend fun singerName(): String? = dao.get(SINGER_NAME)?.takeIf { it.isNotBlank() }
+
+    // Cleared as an empty value, so no delete is needed.
+    override suspend fun setSingerName(name: String?) = dao.put(SettingEntity(SINGER_NAME, name?.trim().orEmpty()))
+
     private fun gainKey(device: InputDevice): String = "input_gain_db:" + when (device) {
         InputDevice.BuiltIn -> "built_in"
         InputDevice.Wired -> "wired"
@@ -67,5 +72,6 @@ class RoomSettingsRepository(database: MeaVoxDatabase) : SettingsRepository {
         const val REVIEW_BACKING = "review_backing_db"
         const val DEFAULT_SEPARATION_MODEL = "default_separation_model"
         const val NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
+        const val SINGER_NAME = "singer_name"
     }
 }

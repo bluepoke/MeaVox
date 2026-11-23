@@ -62,6 +62,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":data"))
     implementation(project(":engine"))
+    implementation(project(":export"))
     implementation(project(":separation"))
     implementation(project(":lyrics"))
     // ADR 1: the NewPipe Sources ship in the network flavor only.

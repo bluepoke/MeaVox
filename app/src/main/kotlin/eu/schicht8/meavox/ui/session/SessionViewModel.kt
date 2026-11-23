@@ -319,8 +319,8 @@ class SessionViewModel(
         }
     }
 
-    /** Exports the Mix being edited as WAV to Music/MeaVox (#14). Leaving the screen cancels it. */
-    fun exportMix(bitsPerSample: Int) {
+    /** Exports the Mix being edited in [format] to Music/MeaVox (#14, #15). Leaving the screen cancels it. */
+    fun exportMix(format: ExportFormat) {
         val editor = _editor.value ?: return
         if (editor.export is ExportProgress.Running) return
         exportJob = viewModelScope.launch {
@@ -328,7 +328,7 @@ class SessionViewModel(
             updateExport(editor.mix, ExportProgress.Running(0f))
             val result = try {
                 // Progress comes from the render's thread; a late one must not outlive the Export.
-                val file = exportMix.export(editor.mix, ExportFormat.Wav(bitsPerSample)) { progress ->
+                val file = exportMix.export(editor.mix, format) { progress ->
                     if (isActive) updateExport(editor.mix, ExportProgress.Running(progress))
                 }
                 ExportProgress.Done(file)
@@ -394,15 +394,15 @@ class SessionViewModel(
         _backingExport.update { it?.copy(transpose = transpose) }
     }
 
-    /** Exports the chosen layer as WAV to Music/MeaVox. Closing the sheet or leaving the screen cancels it. */
-    fun startBackingExport(bitsPerSample: Int) {
+    /** Exports the chosen layer in [format] to Music/MeaVox. Closing the sheet or leaving the screen cancels it. */
+    fun startBackingExport(format: ExportFormat) {
         val dialog = _backingExport.value ?: return
         if (dialog.export is ExportProgress.Running) return
         backingExportJob = viewModelScope.launch {
             fun show(export: ExportProgress?) = _backingExport.update { it?.copy(export = export) }
             show(ExportProgress.Running(0f))
             val result = try {
-                val file = exportBacking.export(id, dialog.layer, dialog.transpose, ExportFormat.Wav(bitsPerSample)) { progress ->
+                val file = exportBacking.export(id, dialog.layer, dialog.transpose, format) { progress ->
                     if (isActive) show(ExportProgress.Running(progress))
                 }
                 ExportProgress.Done(file)

@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable(SETTINGS) {
-                        SettingsRoute(container.modelChoices)
+                        SettingsRoute(container.modelChoices, container.settingsRepository)
                     }
                     composable(STORAGE) {
                         StorageRoute(container.trackStorage, SeparationCatalogue.models.associate { it.id to it.name })

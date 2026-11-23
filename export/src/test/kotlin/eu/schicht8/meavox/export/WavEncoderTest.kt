@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-package eu.schicht8.meavox.data.export
+package eu.schicht8.meavox.export
 
 import java.io.ByteArrayOutputStream
 import java.io.IOException

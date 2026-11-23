@@ -48,7 +48,7 @@ Requirements:
 - Android Studio (or a JDK 17+ and the Android SDK)
 - Android SDK platform 37
 
-AGP downloads the NDK and CMake automatically on first build. CMake fetches Signalsmith Stretch from GitHub, so the first build needs network access.
+AGP downloads the NDK and CMake automatically on first build. CMake fetches Signalsmith Stretch and libFLAC from GitHub and LAME from SourceForge, so the first build needs network access.
 
 ```sh
 ./gradlew assembleNetworkDebug assembleLocalDebug   # both flavors

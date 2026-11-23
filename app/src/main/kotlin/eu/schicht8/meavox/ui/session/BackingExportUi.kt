@@ -26,6 +26,7 @@ import eu.schicht8.meavox.core.export.backingExportTitle
 import eu.schicht8.meavox.core.model.BackingChoice
 import eu.schicht8.meavox.core.model.Track
 import eu.schicht8.meavox.core.model.Transpose
+import eu.schicht8.meavox.core.port.ExportFormat
 
 /** The entry to a Backing Export on the Track's screen, once the Original Audio is stored (#24). */
 @Composable
@@ -47,7 +48,7 @@ internal fun BackingExportRow(onOpen: () -> Unit) {
 internal data class BackingExportActions(
     val onLayer: (BackingChoice) -> Unit,
     val onTranspose: (Transpose) -> Unit,
-    val onExport: (bitsPerSample: Int) -> Unit,
+    val onExport: (ExportFormat) -> Unit,
     val onCancelExport: () -> Unit,
     val onClose: () -> Unit,
 )

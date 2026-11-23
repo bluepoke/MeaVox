@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.core
 
+import eu.schicht8.meavox.core.library.RenameTrack
 import eu.schicht8.meavox.core.mix.ExportMix
 import eu.schicht8.meavox.core.mix.Mix
 import eu.schicht8.meavox.core.mix.MixId
@@ -16,11 +17,14 @@ import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.model.TrackPipelineState
 import eu.schicht8.meavox.core.model.Transpose
 import eu.schicht8.meavox.core.port.ExportFormat
+import eu.schicht8.meavox.core.port.ExportTags
 import eu.schicht8.meavox.core.port.MixRender
 import eu.schicht8.meavox.core.session.BackingAudio
 import eu.schicht8.meavox.core.testing.FakeExportStore
 import eu.schicht8.meavox.core.testing.FakeOfflineRenderer
+import eu.schicht8.meavox.core.testing.InMemoryLyricsRepository
 import eu.schicht8.meavox.core.testing.InMemoryMixRepository
+import eu.schicht8.meavox.core.testing.InMemorySettingsRepository
 import eu.schicht8.meavox.core.testing.InMemoryTakeRepository
 import eu.schicht8.meavox.core.testing.InMemoryTrackFiles
 import eu.schicht8.meavox.core.testing.InMemoryTrackRepository
@@ -41,7 +45,8 @@ class ExportMixTest {
     private val files = InMemoryTrackFiles()
     private val renderer = FakeOfflineRenderer()
     private val store = FakeExportStore()
-    private val export = ExportMix(tracks, takes, mixes, files, renderer, store)
+    private val settings = InMemorySettingsRepository()
+    private val export = ExportMix(tracks, takes, mixes, files, renderer, store, settings)
 
     // Sung from 0:30 for 10 s at +2, with the engine's latency estimate at 100 ms.
     private val take = Take(
@@ -55,8 +60,9 @@ class ExportMixTest {
         backing: BackingAudio,
         settings: MixSettings = MixSettings(backingDb = -12f, vocalDb = 3f, vocalNudgeMs = 25),
         vocalFree: Boolean = false,
+        artist: String? = "Frank Sinatra",
     ): Mix {
-        tracks.addIfAbsent(Track(trackId, "Fly Me to the Moon", "Frank Sinatra", 180_000, pipeline, vocalFree = vocalFree))
+        tracks.addIfAbsent(Track(trackId, "Fly Me to the Moon", artist, 180_000, pipeline, vocalFree = vocalFree))
         takes.add(take)
         return Mix(MixId("m1"), trackId, take.id, "Mix 1", backing, settings, createdAt = 0).also { mixes.add(it) }
     }
@@ -95,6 +101,48 @@ class ExportMixTest {
         assertEquals("content://exports/0", exported.uri)
         assertEquals(1f, progress.last())
         assertTrue(progress.zipWithNext().all { (a, b) -> a <= b })
+    }
+
+    @Test
+    fun `a Mix Export is tagged with the Track's artist featuring the singer's name`() = runTest {
+        val mix = arrange(TrackPipelineState.Ready(FAST), BackingAudio.Instrumental(FAST))
+        settings.setSingerName("Peter")
+
+        export.export(mix.id, ExportFormat.Mp3())
+
+        assertEquals(ExportTags("Fly Me to the Moon (Mix 1)", artist = "Frank Sinatra feat. Peter"), store.exports.single().tags)
+        assertEquals(ExportFormat.Mp3(ExportFormat.Mp3.Bitrate.VbrV2), store.exports.single().format)
+    }
+
+    @Test
+    fun `without a singer's name a Mix Export is tagged with the Track's artist alone`() = runTest {
+        val mix = arrange(TrackPipelineState.Ready(FAST), BackingAudio.Instrumental(FAST))
+        settings.setSingerName("  ")
+
+        export.export(mix.id, ExportFormat.M4a)
+
+        assertEquals("Frank Sinatra", store.exports.single().tags.artist)
+    }
+
+    @Test
+    fun `a Mix of a Track without an artist is tagged with the singer's name alone`() = runTest {
+        val mix = arrange(TrackPipelineState.Ready(FAST), BackingAudio.Instrumental(FAST), artist = null)
+        settings.setSingerName("Peter")
+
+        export.export(mix.id, ExportFormat.Wav())
+
+        assertEquals("Peter", store.exports.single().tags.artist)
+    }
+
+    @Test
+    fun `a Mix Export after a rename is titled and tagged with the Track's new name`() = runTest {
+        val mix = arrange(TrackPipelineState.Ready(FAST), BackingAudio.Instrumental(FAST))
+        settings.setSingerName("Peter")
+        RenameTrack(tracks, InMemoryLyricsRepository())(trackId, title = "Fly Me", artist = "Sinatra")
+
+        export.export(mix.id, ExportFormat.Wav())
+
+        assertEquals(ExportTags("Fly Me (Mix 1)", artist = "Sinatra feat. Peter"), store.exports.single().tags)
     }
 
     @Test

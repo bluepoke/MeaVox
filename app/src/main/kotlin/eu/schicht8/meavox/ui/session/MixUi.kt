@@ -44,10 +44,10 @@ import eu.schicht8.meavox.core.mix.MixSettings
 import eu.schicht8.meavox.core.model.BackingChoice
 import eu.schicht8.meavox.core.model.Take
 import eu.schicht8.meavox.core.model.Track
+import eu.schicht8.meavox.core.port.ExportFormat
 import eu.schicht8.meavox.core.port.Playback
 import eu.schicht8.meavox.core.session.BackingAudio
 import eu.schicht8.meavox.core.session.SessionState
-import eu.schicht8.meavox.data.export.MediaStoreExports
 import eu.schicht8.meavox.ui.formatTime
 import eu.schicht8.meavox.ui.theme.MeaVoxButtonShape
 import kotlinx.coroutines.delay
@@ -118,7 +118,7 @@ internal data class MixEditorActions(
     val onBacking: (BackingChoice) -> Unit,
     val onPreview: () -> Unit,
     val onStop: () -> Unit,
-    val onExport: (bitsPerSample: Int) -> Unit,
+    val onExport: (ExportFormat) -> Unit,
     val onCancelExport: () -> Unit,
     val onClose: () -> Unit,
 )
@@ -279,11 +279,13 @@ private fun StoreWhenSettled(settings: MixSettings, onDone: () -> Unit) {
  * Mix and for a Backing Export alike.
  */
 @Composable
-internal fun ExportSection(export: ExportProgress?, onExport: (bitsPerSample: Int) -> Unit, onCancel: () -> Unit) {
+internal fun ExportSection(export: ExportProgress?, onExport: (ExportFormat) -> Unit, onCancel: () -> Unit) {
+    var kind by remember { mutableStateOf(FormatKind.Mp3) }
     var bits by remember { mutableIntStateOf(16) }
+    var mp3Bitrate by remember { mutableStateOf(ExportFormat.Mp3.Bitrate.VbrV2) }
     val context = LocalContext.current
     Panel(spacing = 10.dp) {
-        Text("Export as WAV", style = rowLabel())
+        Text("Export", style = rowLabel())
         when (export) {
             is ExportProgress.Running -> {
                 Text("Exporting… ${(export.progress * 100).toInt()} %", style = MaterialTheme.typography.bodyMedium)
@@ -292,10 +294,32 @@ internal fun ExportSection(export: ExportProgress?, onExport: (bitsPerSample: In
             }
             else -> {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    Choice("16-bit", bits == 16, index = 0, count = 2) { bits = 16 }
-                    Choice("24-bit", bits == 24, index = 1, count = 2) { bits = 24 }
+                    FormatKind.entries.forEachIndexed { index, it ->
+                        Choice(it.label, kind == it, index = index, count = FormatKind.entries.size) { kind = it }
+                    }
                 }
-                Button(onClick = { onExport(bits) }, shape = MeaVoxButtonShape, modifier = Modifier.fillMaxWidth().height(44.dp)) {
+                when (kind) {
+                    FormatKind.Mp3 -> SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        Choice("VBR V2", mp3Bitrate == ExportFormat.Mp3.Bitrate.VbrV2, index = 0, count = 2) {
+                            mp3Bitrate = ExportFormat.Mp3.Bitrate.VbrV2
+                        }
+                        Choice("320 kbps", mp3Bitrate == ExportFormat.Mp3.Bitrate.Cbr320, index = 1, count = 2) {
+                            mp3Bitrate = ExportFormat.Mp3.Bitrate.Cbr320
+                        }
+                    }
+                    FormatKind.M4a -> Unit
+                    FormatKind.Wav -> SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        Choice("16-bit", bits == 16, index = 0, count = 2) { bits = 16 }
+                        Choice("24-bit", bits == 24, index = 1, count = 2) { bits = 24 }
+                    }
+                }
+                Text(kind.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val format = when (kind) {
+                    FormatKind.Mp3 -> ExportFormat.Mp3(mp3Bitrate)
+                    FormatKind.M4a -> ExportFormat.M4a
+                    FormatKind.Wav -> ExportFormat.Wav(bits)
+                }
+                Button(onClick = { onExport(format) }, shape = MeaVoxButtonShape, modifier = Modifier.fillMaxWidth().height(44.dp)) {
                     Text("Export", fontWeight = FontWeight.Bold)
                 }
                 when (export) {
@@ -307,7 +331,7 @@ internal fun ExportSection(export: ExportProgress?, onExport: (bitsPerSample: In
                         )
                         NeutralOutlinedButton("Share", {
                             val send = Intent(Intent.ACTION_SEND)
-                                .setType(MediaStoreExports.WAV_MIME_TYPE)
+                                .setType(export.file.mimeType)
                                 .putExtra(Intent.EXTRA_STREAM, Uri.parse(export.file.uri))
                                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             context.startActivity(Intent.createChooser(send, export.file.displayName))
@@ -323,6 +347,13 @@ internal fun ExportSection(export: ExportProgress?, onExport: (bitsPerSample: In
             }
         }
     }
+}
+
+/** The formats the export offers (ADR 8), MP3 first: it plays everywhere. */
+private enum class FormatKind(val label: String, val hint: String) {
+    Mp3("MP3", "Plays everywhere. VBR V2 sounds as good as 320 kbps to most ears, in a smaller file."),
+    M4a("M4A", "AAC at 256 kbps: smaller than MP3 at the same quality."),
+    Wav("WAV", "Lossless, for editing further. Large."),
 }
 
 private fun BackingAudio.label(): String = when (this) {

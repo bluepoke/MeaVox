@@ -29,7 +29,12 @@ class FakeExportStore : ExportStore {
             override suspend fun commit(): ExportedFile {
                 check(written.frames == null || written.framesWritten == written.frames) { "${written.framesWritten} of ${written.frames} frames" }
                 written.committed = true
-                return ExportedFile("content://exports/${exports.indexOf(written)}", "${tags.title}.wav")
+                val (extension, mimeType) = when (format) {
+                    is ExportFormat.Wav -> "wav" to "audio/x-wav"
+                    is ExportFormat.Mp3 -> "mp3" to "audio/mpeg"
+                    ExportFormat.M4a -> "m4a" to "audio/mp4"
+                }
+                return ExportedFile("content://exports/${exports.indexOf(written)}", "${tags.title}.$extension", mimeType)
             }
 
             override suspend fun abort() {

@@ -43,4 +43,12 @@ class InMemorySettingsRepository : SettingsRepository {
     override suspend fun setNotificationPermissionAsked() {
         notificationPermissionAsked = true
     }
+
+    private var singerName: String? = null
+
+    override suspend fun singerName(): String? = singerName
+
+    override suspend fun setSingerName(name: String?) {
+        singerName = name?.trim()?.takeIf { it.isNotEmpty() }
+    }
 }
