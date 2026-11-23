@@ -96,6 +96,7 @@
     <string name="storage_original_audio">Original</string>
     <string name="storage_stems">Stems (%1$s)</string>
     <string name="storage_stems_in_progress">Stems (%1$s), in Arbeit</string>
+    <string name="storage_stems_in_use">Stems (%1$s), in Verwendung</string>
     <string name="storage_takes">Takes (%1$d)</string>
     <string name="storage_delete_track">Song löschen</string>
     <string name="model_fast">Schnell</string>
@@ -156,6 +157,8 @@
     <string name="session_reseparate_title">Gesang neu entfernen</string>
     <string name="session_separate_title">Gesang entfernen</string>
     <string name="session_reseparate_text">Bis das neue Instrumental fertig ist, läuft das Original. Takes bleiben synchron.</string>
+    <string name="session_reseparate_text_keeps">Bis das neue Instrumental fertig ist, läuft das bisherige. Takes bleiben synchron.</string>
+    <string name="session_reseparate_text_back">Das Instrumental von %1$s ist vollständig, der Track wechselt sofort zurück.</string>
     <string name="session_view_karaoke">Karaoke</string>
     <string name="session_view_page">Seite</string>
     <string name="session_cant_play">Dieser Song lässt sich nicht abspielen: %1$s</string>
@@ -167,6 +170,8 @@
     <string name="session_instrumental_later">Das Instrumental lässt sich wählen, sobald die Gesangsentfernung fertig ist.</string>
     <string name="session_switches_after_take">Wechselt, sobald dieser Take fertig ist.</string>
     <string name="session_pipeline_failed">%1$s: %2$s</string>
+    <string name="session_previous_instrumental_meanwhile">Bis dahin wird das Instrumental von %1$s verwendet.</string>
+    <string name="session_previous_instrumental_still">Das Instrumental von %1$s wird weiter verwendet.</string>
     <string name="action_retry">Erneut versuchen</string>
     <string name="session_last_try">Letzter Versuch: %1$s</string>
     <string name="session_lyrics">Songtext</string>

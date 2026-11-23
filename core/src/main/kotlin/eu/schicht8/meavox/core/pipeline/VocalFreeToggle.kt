@@ -23,9 +23,12 @@ class VocalFreeToggle(
     private val mixes: MixRepository,
     private val models: List<SeparationModelId>,
 ) {
-    /** Bytes that marking the Track would free: its stems. The UI asks for confirmation when this isn't 0. */
+    /**
+     * Bytes that marking the Track would free: the stems of its Instrumental, also of the one used while
+     * it is re-separated (ADR 22). The UI asks for confirmation when this isn't 0.
+     */
     suspend fun stemBytes(id: TrackId): Long {
-        val model = (tracks.get(id)?.pipeline as? TrackPipelineState.Ready)?.model ?: return 0
+        val model = tracks.get(id)?.instrumentalModel ?: return 0
         return files.sizeOfStems(id, model)
     }
 

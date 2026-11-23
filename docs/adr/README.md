@@ -21,3 +21,4 @@
 - [19. Three Separation Models (Fast, Medium, Best) and a pre-selected Default Separation Model](0019-three-separation-models-and-default-model.md)
 - [20. One screen per Track: Track detail and the Session merged, with a per-Track Backing Audio choice](0020-track-screen-is-the-session.md)
 - [21. The UI in English and German, with the domain core free of display text](0021-ui-in-english-and-german.md)
+- [22. The previous Instrumental plays while a Track is re-separated](0022-previous-instrumental-plays-while-reseparating.md)

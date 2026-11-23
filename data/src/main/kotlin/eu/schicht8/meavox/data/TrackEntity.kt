@@ -46,6 +46,11 @@ internal data class TrackEntity(
     @ColumnInfo(name = "separation_model") val separationModel: String? = null,
     /** The Last Transpose in semitones (version 13, #23); 0 for Tracks from before. */
     @ColumnInfo(name = "last_transpose", defaultValue = "0") val lastTranspose: Int = 0,
+    /**
+     * While the Track is re-separated, or after that failed, the Separation Model whose Instrumental
+     * plays meanwhile (version 16, #37, ADR 22); null otherwise.
+     */
+    @ColumnInfo(name = "pipeline_previous_model") val pipelinePreviousModel: String? = null,
 )
 
 internal fun Track.toEntity(addedAt: Long): TrackEntity {
@@ -67,6 +72,7 @@ internal fun Track.toEntity(addedAt: Long): TrackEntity {
         backingChoice = backingChoice.toColumn(),
         separationModel = separationModel?.value,
         lastTranspose = lastTranspose.semitones,
+        pipelinePreviousModel = pipelineColumns.previous,
     )
 }
 
@@ -75,7 +81,12 @@ internal fun TrackEntity.toTrack() = Track(
     title = title,
     artist = artist,
     durationMs = durationMs,
-    pipeline = PipelineColumns(pipelineState, pipelineProgress, FailureColumns(kind = pipelineFailureKind, detail = pipelineFailure, service = pipelineFailureService)).toState(),
+    pipeline = PipelineColumns(
+        pipelineState,
+        pipelineProgress,
+        FailureColumns(kind = pipelineFailureKind, detail = pipelineFailure, service = pipelineFailureService),
+        pipelinePreviousModel,
+    ).toState(),
     lastSessionAt = lastSessionAt,
     vocalFree = vocalFree,
     backingChoice = backingChoiceFromColumn(backingChoice),
@@ -99,6 +110,8 @@ internal data class PipelineColumns(
     val state: String,
     val progress: String? = null,
     val failure: FailureColumns = FailureColumns(null, null, null),
+    /** The model whose Instrumental plays while the Track is re-separated (ADR 22). */
+    val previous: String? = null,
 )
 
 internal fun TrackPipelineState.toColumns(): PipelineColumns = when (this) {
@@ -107,11 +120,13 @@ internal fun TrackPipelineState.toColumns(): PipelineColumns = when (this) {
     is TrackPipelineState.Downloading ->
         PipelineColumns("downloading", progress = "downloading:${progress ?: ""}:$failedAttempts", failure = retryReason.toColumns())
     TrackPipelineState.Downloaded -> PipelineColumns("downloaded")
-    is TrackPipelineState.Separating -> PipelineColumns("$SEPARATING_PREFIX${model.value}", progress = progress?.toColumn())
+    is TrackPipelineState.Separating ->
+        PipelineColumns("$SEPARATING_PREFIX${model.value}", progress = progress?.toColumn(), previous = previous?.value)
     // A Vocal-Free Track is Ready without stems (ADR 14): plain `ready`.
     is TrackPipelineState.Ready -> PipelineColumns(model?.let { "$READY_PREFIX${it.value}" } ?: READY)
     is TrackPipelineState.StemsDeleted -> PipelineColumns("$STEMS_DELETED_PREFIX${model.value}")
-    is TrackPipelineState.Failed -> PipelineColumns("$FAILED_PREFIX${step.toColumn()}", failure = reason.toColumns())
+    is TrackPipelineState.Failed ->
+        PipelineColumns("$FAILED_PREFIX${step.toColumn()}", failure = reason.toColumns(), previous = previous?.value)
 }
 
 private fun PipelineColumns.toState(): TrackPipelineState = when {
@@ -126,7 +141,11 @@ private fun PipelineColumns.toState(): TrackPipelineState = when {
     }
     state == "downloaded" -> TrackPipelineState.Downloaded
     state.startsWith(SEPARATING_PREFIX) ->
-        TrackPipelineState.Separating(SeparationModelId(state.removePrefix(SEPARATING_PREFIX)), progress?.let(::progressFromColumn))
+        TrackPipelineState.Separating(
+            SeparationModelId(state.removePrefix(SEPARATING_PREFIX)),
+            progress?.let(::progressFromColumn),
+            previous?.let(::SeparationModelId),
+        )
     state == READY -> TrackPipelineState.Ready(model = null)
     state.startsWith(READY_PREFIX) -> TrackPipelineState.Ready(SeparationModelId(state.removePrefix(READY_PREFIX)))
     state.startsWith(STEMS_DELETED_PREFIX) ->
@@ -135,6 +154,7 @@ private fun PipelineColumns.toState(): TrackPipelineState = when {
         TrackPipelineState.Failed(
             stepFromColumn(state.removePrefix(FAILED_PREFIX)),
             failure.toReason() ?: FailureReason(FailureKind.Unexpected),
+            previous?.let(::SeparationModelId),
         )
     else -> error("unknown pipeline state '$state'")
 }

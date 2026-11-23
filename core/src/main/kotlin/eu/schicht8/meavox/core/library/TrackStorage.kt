@@ -29,16 +29,14 @@ class TrackStorage(
     /**
      * Deletes the Track's stems of [model]. If the Track is Ready with them, it becomes
      * [TrackPipelineState.StemsDeleted] and they are made again when the Track is next opened.
-     * @throws IllegalStateException while Separation with [model] is running for the Track.
+     * @throws IllegalStateException while they are in use (see [Track.stemsInUse]): being made, or
+     * playing while the Track is re-separated (ADR 22).
      */
     suspend fun deleteStems(id: TrackId, model: SeparationModelId) {
         val track = checkNotNull(tracks.get(id)) { "no Track $id" }
-        when (track.pipeline) {
-            is TrackPipelineState.Separating -> check(track.pipeline.model != model) { "Separation with ${model.value} is running" }
-            // State first, then the files: nothing tries to play stems that are gone.
-            TrackPipelineState.Ready(model) -> tracks.updatePipeline(id, TrackPipelineState.StemsDeleted(model))
-            else -> Unit
-        }
+        track.stemsInUse(model)?.let { error("the stems of ${model.value} are in use: $it") }
+        // State first, then the files: nothing tries to play stems that are gone.
+        if (track.pipeline == TrackPipelineState.Ready(model)) tracks.updatePipeline(id, TrackPipelineState.StemsDeleted(model))
         files.deleteStems(id, model)
     }
 

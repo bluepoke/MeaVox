@@ -1,6 +1,6 @@
 # 17. Deleted stems come back when the Track is next opened
 
-- Status: Accepted (amends ADR 10; amended by ADR 20)
+- Status: Accepted (amends ADR 10; amended by ADR 20, ADR 22)
 - Date: 2026-11-17
 
 ## Context
@@ -9,7 +9,7 @@ The storage screen (ADR 8, #20) lets the user delete a Track's stems to free spa
 ## Decision
 - Deleting the stems of a Ready Track moves it to a new Track Pipeline state, **Stems Deleted**, which remembers the Separation Model. The Track Pipeline doesn't queue it.
 - **Opening the Track** on Track detail or in a Session moves it back to `Separating` with the same model. The Original Audio plays meanwhile, and the usual switch to the Instrumental happens once it is `Ready`. Since ADR 20 both are one screen, and the switch happens only if the Instrumental is the Track's Backing Audio choice.
-- Stems can't be deleted while Separation with that model is running.
+- Stems can't be deleted while Separation with that model is running. Since ADR 22 (#37), neither can the previous model's stems that play while the Track is re-separated, or after that failed.
 
 ## Considered Options
 - **Separate again only when a Session opens.** Track detail would keep playing the Original Audio. Rejected: playing the Track is a use too, and the switch to the Instrumental already works there.

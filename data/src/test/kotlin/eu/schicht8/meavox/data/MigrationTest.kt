@@ -152,6 +152,7 @@ class MigrationTest(private val from: Int) {
             "pipeline_failure" to "the server answered HTTP 503",
             "pipeline_failure_kind" to "server_busy",
             "pipeline_failure_service" to "YouTube",
+            "pipeline_previous_model" to "spleeter-2stems",
             "last_session_at" to 1_700_000_100_000L,
             "vocal_free" to 0L,
             "backing_choice" to "original_audio",

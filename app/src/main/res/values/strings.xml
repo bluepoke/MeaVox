@@ -105,6 +105,7 @@
     <!-- %1$s is a vocal removal model's name. -->
     <string name="storage_stems">Stems (%1$s)</string>
     <string name="storage_stems_in_progress">Stems (%1$s), in progress</string>
+    <string name="storage_stems_in_use">Stems (%1$s), in use</string>
     <string name="storage_takes">Takes (%1$d)</string>
     <string name="storage_delete_track">Delete song</string>
     <string name="model_fast">Fast</string>
@@ -167,6 +168,8 @@
     <string name="session_reseparate_title">Remove the vocals again</string>
     <string name="session_separate_title">Remove the vocals</string>
     <string name="session_reseparate_text">The original audio plays until the new instrumental is ready. Takes stay in sync.</string>
+    <string name="session_reseparate_text_keeps">The current instrumental plays until the new one is ready. Takes stay in sync.</string>
+    <string name="session_reseparate_text_back">The instrumental by %1$s is complete, so the Track goes back to it at once.</string>
     <string name="session_view_karaoke">Karaoke</string>
     <string name="session_view_page">Page</string>
     <string name="session_cant_play">Can\'t play this song: %1$s</string>
@@ -179,6 +182,8 @@
     <string name="session_switches_after_take">Switches once this Take is done.</string>
     <!-- %1$s is what failed (Download failed), %2$s why. -->
     <string name="session_pipeline_failed">%1$s: %2$s</string>
+    <string name="session_previous_instrumental_meanwhile">Until then, the Instrumental by %1$s is used.</string>
+    <string name="session_previous_instrumental_still">The Instrumental by %1$s is still used.</string>
     <string name="action_retry">Retry</string>
     <string name="session_last_try">Last try: %1$s</string>
     <string name="session_lyrics">Lyrics</string>

@@ -45,9 +45,9 @@ import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.library.TrackStorage
 import eu.schicht8.meavox.core.library.TrackUsage
 import eu.schicht8.meavox.core.model.SeparationModelId
+import eu.schicht8.meavox.core.model.StemsInUse
 import eu.schicht8.meavox.core.model.Take
 import eu.schicht8.meavox.core.model.TrackId
-import eu.schicht8.meavox.core.model.TrackPipelineState
 import eu.schicht8.meavox.ui.resolve
 
 @Composable
@@ -161,12 +161,17 @@ private fun TrackUsageCard(
         }
         UsageRow(stringResource(R.string.storage_original_audio), size(usage.originalAudioBytes))
         usage.stemBytes.forEach { (model, bytes) ->
-            // Stems still being written by Separation can't be deleted.
-            val separating = (usage.track.pipeline as? TrackPipelineState.Separating)?.model == model
+            // Stems still being written by Separation, or playing while the Track is re-separated, can't be deleted.
+            val inUse = usage.track.stemsInUse(model)
+            val label = when (inUse) {
+                StemsInUse.BeingMade -> R.string.storage_stems_in_progress
+                StemsInUse.Playing -> R.string.storage_stems_in_use
+                null -> R.string.storage_stems
+            }
             UsageRow(
-                stringResource(if (separating) R.string.storage_stems_in_progress else R.string.storage_stems, modelNames[model] ?: model.value),
+                stringResource(label, modelNames[model] ?: model.value),
                 size(bytes),
-                onDelete = if (separating) null else ({ onDelete(Deletion.Stems(usage, model)) }),
+                onDelete = if (inUse != null) null else ({ onDelete(Deletion.Stems(usage, model)) }),
             )
         }
         if (usage.takes.isNotEmpty()) UsageRow(stringResource(R.string.storage_takes, usage.takes.size), size(usage.takes.sumOf { it.bytes }))

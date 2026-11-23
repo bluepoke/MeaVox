@@ -19,7 +19,7 @@ data class Track(
     val vocalFree: Boolean = false,
     /**
      * What the user wants to sing over (GLOSSARY: Backing Audio), kept per Track. The Instrumental
-     * plays only once there is one (see [instrumentalModel]); the Original Audio plays meanwhile.
+     * plays only while there is one (see [instrumentalModel]); the Original Audio plays meanwhile.
      */
     val backingChoice: BackingChoice = BackingChoice.Instrumental,
     /**
@@ -36,11 +36,28 @@ data class Track(
     val lastTranspose: Transpose = Transpose.None,
 ) {
     /**
-     * The Separation Model whose Instrumental is stored, once the Track is Ready with stems; null
-     * before, and always for a Vocal-Free Track (ADR 14).
+     * The Separation Model whose Instrumental plays: the one the Track is Ready with, or while it is
+     * re-separated with another model, or after that failed, the one it was Ready with before (ADR 22).
+     * Null before the first Separation has finished, and always for a Vocal-Free Track (ADR 14).
      */
     val instrumentalModel: SeparationModelId?
-        get() = (pipeline as? TrackPipelineState.Ready)?.model
+        get() = when (pipeline) {
+            is TrackPipelineState.Ready -> pipeline.model
+            is TrackPipelineState.Separating -> pipeline.previous
+            is TrackPipelineState.Failed -> pipeline.previous
+            TrackPipelineState.Added, is TrackPipelineState.Downloading, TrackPipelineState.Downloaded,
+            is TrackPipelineState.StemsDeleted -> null
+        }
+
+    /**
+     * Why the Track's stems of [model] must not be deleted now, or null if they may be: they are being
+     * made, or they are the previous Instrumental playing while the Track is re-separated (ADR 22).
+     */
+    fun stemsInUse(model: SeparationModelId): StemsInUse? = when {
+        pipeline is TrackPipelineState.Separating && pipeline.model == model -> StemsInUse.BeingMade
+        pipeline !is TrackPipelineState.Ready && instrumentalModel == model -> StemsInUse.Playing
+        else -> null
+    }
 
     /**
      * The Separation Model the Track's vocal removal uses: the one it is Ready with, the one it is
@@ -65,6 +82,15 @@ data class Track(
             is TrackPipelineState.StemsDeleted -> true
             is TrackPipelineState.Failed -> pipeline.step != PipelineStep.Downloading
         }
+}
+
+/** Why stems can't be deleted now (see [Track.stemsInUse]). */
+enum class StemsInUse {
+    /** Separation is writing them. */
+    BeingMade,
+
+    /** They are the previous Instrumental, playing until the new one is there (ADR 22). */
+    Playing,
 }
 
 /** Which Backing Audio the user chose for a Track (GLOSSARY: Backing Audio). */
@@ -112,9 +138,15 @@ sealed interface TrackPipelineState {
 
     /**
      * Separation with [model] is queued or running; [progress] is null until it has started.
-     * The Original Audio stays playable meanwhile.
+     * The Original Audio stays playable meanwhile. When a Ready Track is re-separated, [previous] is
+     * the model it was Ready with: its stems are complete, and its Instrumental plays until the new
+     * one is there (ADR 22).
      */
-    data class Separating(val model: SeparationModelId, val progress: SeparationProgress? = null) : TrackPipelineState
+    data class Separating(
+        val model: SeparationModelId,
+        val progress: SeparationProgress? = null,
+        val previous: SeparationModelId? = null,
+    ) : TrackPipelineState
 
     /**
      * Every step the Track needs is done (ADR 14): Separation with [model] has finished and its
@@ -128,8 +160,15 @@ sealed interface TrackPipelineState {
      */
     data class StemsDeleted(val model: SeparationModelId) : TrackPipelineState
 
-    /** [step] stopped for a [reason] that retrying alone won't fix; the user can retry. */
-    data class Failed(val step: PipelineStep, val reason: FailureReason) : TrackPipelineState
+    /**
+     * [step] stopped for a [reason] that retrying alone won't fix; the user can retry. A failed
+     * re-separation keeps [previous], the model whose Instrumental plays on (ADR 22).
+     */
+    data class Failed(
+        val step: PipelineStep,
+        val reason: FailureReason,
+        val previous: SeparationModelId? = null,
+    ) : TrackPipelineState
 }
 
 /** A step of the Track Pipeline that can fail (ADR 10). */

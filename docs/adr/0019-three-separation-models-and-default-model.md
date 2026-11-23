@@ -1,6 +1,6 @@
 # 19. Three Separation Models (Fast, Medium, Best) and a pre-selected Default Separation Model
 
-- Status: Accepted (amends ADR 15)
+- Status: Accepted (amends ADR 15; amended by ADR 22)
 - Date: 2026-11-18
 
 ## Context
@@ -28,7 +28,7 @@ ADR 15 also says the model picker exists, but not which model it starts on, or t
 - **The picked model stays on the Track** (`Track.separationModel`): the one picked in the import sheet, or later when re-separating or unmarking Vocal-Free. A retry after a failed Separation uses it. Tracks added before #17 have none and are separated with **Fast**, not the Default Separation Model (#36): Settings sets the default without asking for download consent, so an undownloaded Best would download 59 MB unasked, and the user never picked anything else for these Tracks. Fast is the first model every install downloads, so it normally needs no download.
 - **Download consent:** a model not yet installed shows its size in the picker, a note under it, and a confirm button that reads "Download 59 MB and add" (or "… and re-separate"). Confirming is the consent. Picking the default in Settings asks nothing; the consent comes when the model is first used.
 - **Expected duration** is the Track's length times the model's RTF on the weak device (0.16, 1.34, 3.4), or relative to the length when that is unknown (a local file before import).
-- **Re-separating** keeps the previous model's stems until they are deleted on the storage screen. The Original Audio plays meanwhile, as for Stems Deleted (ADR 17). A Separation still running is replaced (ADR 10, #28).
+- **Re-separating** keeps the previous model's stems until they are deleted on the storage screen. The Original Audio played meanwhile, as for Stems Deleted (ADR 17); since ADR 22 (#37) the previous model's Instrumental plays, also after the new model failed. A Separation still running is replaced (ADR 10, #28).
 - **Mixes** don't exist yet (ADR 7). Switching a Mix to a re-separated Instrumental lands with the Mix ticket.
 
 ## Considered Options

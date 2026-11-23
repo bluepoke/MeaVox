@@ -17,6 +17,7 @@ import kotlin.test.assertEquals
 
 class TrackEntityTest {
     private val model = SeparationModelId("spleeter-2stems")
+    private val previous = SeparationModelId("uvr-mdx-karaoke")
 
     private fun track(state: TrackPipelineState) =
         Track(TrackId(SourceId("youtube"), "abc"), "Song", "Artist", 1_000, state)
@@ -39,6 +40,10 @@ class TrackEntityTest {
             TrackPipelineState.Ready(model = null),
             TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.AudioUndecodable, "no decoder for audio/x-weird")),
             TrackPipelineState.Failed(PipelineStep.Downloading, FailureReason(FailureKind.ServerError, "404")),
+            // Re-separating with another model while the previous one's Instrumental plays (ADR 22).
+            TrackPipelineState.Separating(model, previous = previous),
+            TrackPipelineState.Separating(model, SeparationProgress(SeparationProgress.Stage.Separating, 0.5f), previous = previous),
+            TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.OutOfMemory), previous = previous),
         )
         for (state in states) {
             assertEquals(track(state), track(state).toEntity(addedAt = 1).toTrack(), "$state")

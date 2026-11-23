@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -324,10 +325,15 @@ private fun ModelPickDialog(pick: ModelPick, track: Track?, onPick: (SeparationM
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (reseparate) {
-                    Text(
-                        stringResource(R.string.session_reseparate_text),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    // The Instrumental the Track has keeps playing until the new one is there; going back
+                    // to it needs no Separation (ADR 22).
+                    val instrumental = track?.instrumentalModel
+                    val text = when {
+                        instrumental == null -> stringResource(R.string.session_reseparate_text)
+                        pick.selected == instrumental -> stringResource(R.string.session_reseparate_text_back, selected?.name ?: instrumental.value)
+                        else -> stringResource(R.string.session_reseparate_text_keeps)
+                    }
+                    Text(text, style = MaterialTheme.typography.bodyMedium)
                 }
                 ModelPicker(pick.options, pick.selected, onPick, track?.durationMs, current = current.takeIf { reseparate })
                 DownloadNote(selected)
@@ -504,7 +510,7 @@ private fun TrackTitle(track: Track?) {
 @Composable
 private fun SessionControls(openError: UiText?, content: SessionContent, actions: SessionActions) {
     val track = content.track ?: return LinearProgressIndicator(Modifier.fillMaxWidth())
-    PipelineStatus(track.pipeline, actions.onRetry)
+    PipelineStatus(track, content.modelName, actions.onRetry)
     VocalRemoval(track, content.modelName, actions.onReseparate)
     LyricsStatus(content.lyrics, actions.onConfirmLyrics, actions.onChooseLyrics)
     when {
@@ -565,11 +571,14 @@ private fun BackingChoiceRow(track: Track, playing: BackingAudio, onChoose: (Bac
     }
 }
 
-/** Where the Track is in the Track Pipeline (ADR 10); what plays is the Backing Audio choice's business. */
+/**
+ * Where the Track is in the Track Pipeline (ADR 10), and which earlier Instrumental is used while it
+ * is re-separated (ADR 22); what plays is the Backing Audio choice's business.
+ */
 @Composable
-private fun PipelineStatus(pipeline: TrackPipelineState, onRetry: () -> Unit) {
+private fun PipelineStatus(track: Track, modelName: (SeparationModelId) -> String, onRetry: () -> Unit) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    when (pipeline) {
+    when (val pipeline = track.pipeline) {
         is TrackPipelineState.Separating -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(pipeline.label(), style = MaterialTheme.typography.bodyMedium)
             val progress = pipeline.progress
@@ -578,9 +587,11 @@ private fun PipelineStatus(pipeline: TrackPipelineState, onRetry: () -> Unit) {
             } else {
                 LinearProgressIndicator(progress = { progress.fraction }, modifier = Modifier.fillMaxWidth())
             }
+            PreviousInstrumental(track, modelName, R.string.session_previous_instrumental_meanwhile)
         }
         is TrackPipelineState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.session_pipeline_failed, pipeline.label(), pipeline.reason.text().resolve()), color = MeaVoxTheme.colors.record, style = MaterialTheme.typography.bodyMedium)
+            PreviousInstrumental(track, modelName, R.string.session_previous_instrumental_still)
             NeutralOutlinedButton(stringResource(R.string.action_retry), onRetry, Modifier.height(44.dp))
         }
         is TrackPipelineState.Downloading -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -600,6 +611,13 @@ private fun PipelineStatus(pipeline: TrackPipelineState, onRetry: () -> Unit) {
     }
 }
 
+/** The Instrumental used while the Track is re-separated, or after that failed (ADR 22), worded by [text]. */
+@Composable
+private fun PreviousInstrumental(track: Track, modelName: (SeparationModelId) -> String, @StringRes text: Int) {
+    val model = track.instrumentalModel ?: return
+    Text(stringResource(text, modelName(model)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
 /**
  * Which Separation Model removes the Track's vocals, and the way to pick another (ADR 19). Not for a
  * Vocal-Free Track, which isn't separated (ADR 14), nor before the Original Audio is stored.
@@ -607,7 +625,8 @@ private fun PipelineStatus(pipeline: TrackPipelineState, onRetry: () -> Unit) {
 @Composable
 private fun VocalRemoval(track: Track, modelName: (SeparationModelId) -> String, onReseparate: () -> Unit) {
     if (track.vocalFree || !track.hasOriginalAudio) return
-    val model = track.vocalRemovalModel
+    // After a failed Separation, the model Retry separates with.
+    val model = track.vocalRemovalModel ?: track.separationModel.takeIf { track.pipeline is TrackPipelineState.Failed }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(stringResource(R.string.import_vocal_removal), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)

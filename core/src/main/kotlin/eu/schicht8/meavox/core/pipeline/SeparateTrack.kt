@@ -72,13 +72,13 @@ class SeparateTrack(
             is TrackPipelineState.Separating -> if (state.model != model) return@coroutineScope Outcome.Skipped
             else -> return@coroutineScope Outcome.Skipped
         }
-        if (!writeWhileWaiting(id, model, TrackPipelineState.Separating(model))) return@coroutineScope Outcome.Skipped
+        if (!writeWhileWaiting(id, model) { previous -> TrackPipelineState.Separating(model, previous = previous) }) return@coroutineScope Outcome.Skipped
         // The Separator reports from any thread, sometimes many times a second (e.g. per block of a
         // download). Only the latest progress in whole percent is stored: the flow drops repeats,
         // so each stage writes the Track (and updates the notification) at most about 100 times.
         val progress = MutableStateFlow<SeparationProgress?>(null)
         val storing = launch {
-            progress.filterNotNull().collect { writeWhileWaiting(id, model, TrackPipelineState.Separating(model, it)) }
+            progress.filterNotNull().collect { reported -> writeWhileWaiting(id, model) { previous -> TrackPipelineState.Separating(model, reported, previous) } }
         }
         val failure = try {
             separator.separate(
@@ -98,37 +98,48 @@ class SeparateTrack(
         } finally {
             storing.cancelAndJoin()
         }
-        val (state, outcome) = when {
-            failure == null -> TrackPipelineState.Ready(model) to Outcome.Ready
-            // Keep showing how far it got; the next run continues from the checkpoint.
-            failure is SeparationFailed && failure.retryable ->
-                TrackPipelineState.Separating(model, progress.value) to Outcome.RetryLater
-            else -> {
-                val reason = when (failure) {
-                    is OutOfMemoryError -> FailureReason(FailureKind.OutOfMemory)
-                    is SeparationFailed -> failure.reason
-                    else -> FailureReason.unexpected(failure)
-                }
-                TrackPipelineState.Failed(PipelineStep.Separating, reason) to Outcome.Failed
+        val outcome = when {
+            failure == null -> Outcome.Ready
+            failure is SeparationFailed && failure.retryable -> Outcome.RetryLater
+            else -> Outcome.Failed
+        }
+        val written = writeWhileWaiting(id, model) { previous ->
+            when (outcome) {
+                Outcome.Ready -> TrackPipelineState.Ready(model)
+                // Keep showing how far it got; the next run continues from the checkpoint.
+                Outcome.RetryLater -> TrackPipelineState.Separating(model, progress.value, previous)
+                // A failed re-separation leaves the previous Instrumental playing (ADR 22).
+                else -> TrackPipelineState.Failed(PipelineStep.Separating, checkNotNull(failure).toReason(), previous)
             }
         }
-        if (writeWhileWaiting(id, model, state)) outcome else Outcome.Skipped
+        if (written) outcome else Outcome.Skipped
     }
 
     /**
-     * Stores [state] if the Track still waits for Separation with [model] (Downloaded, or Separating
-     * with it, and not Vocal-Free); returns whether it did.
+     * Stores the [state] made from the model whose Instrumental plays meanwhile (see
+     * [TrackPipelineState.Separating.previous]) if the Track still waits for Separation with [model]
+     * (Downloaded, or Separating with it, and not Vocal-Free); returns whether it did.
      */
-    private suspend fun writeWhileWaiting(id: TrackId, model: SeparationModelId, state: TrackPipelineState): Boolean {
+    private suspend fun writeWhileWaiting(
+        id: TrackId,
+        model: SeparationModelId,
+        state: (previous: SeparationModelId?) -> TrackPipelineState,
+    ): Boolean {
         var written = false
         tracks.update(id) { track ->
             val pipeline = track.pipeline
             val waiting = pipeline == TrackPipelineState.Downloaded || (pipeline is TrackPipelineState.Separating && pipeline.model == model)
             written = waiting && !track.vocalFree
-            if (written) track.copy(pipeline = state) else null
+            if (written) track.copy(pipeline = state((pipeline as? TrackPipelineState.Separating)?.previous)) else null
         }
         return written
     }
+}
+
+private fun Throwable.toReason(): FailureReason = when (this) {
+    is OutOfMemoryError -> FailureReason(FailureKind.OutOfMemory)
+    is SeparationFailed -> reason
+    else -> FailureReason.unexpected(this)
 }
 
 private fun SeparationProgress.inWholePercent() = copy(fraction = floor(fraction * 100) / 100)

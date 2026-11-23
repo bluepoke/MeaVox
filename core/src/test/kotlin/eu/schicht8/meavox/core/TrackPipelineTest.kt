@@ -19,7 +19,6 @@ import eu.schicht8.meavox.core.pipeline.VocalFreeToggle
 import eu.schicht8.meavox.core.port.SeparationProgress
 import eu.schicht8.meavox.core.session.BackingAudio
 import eu.schicht8.meavox.core.session.Sessions
-import eu.schicht8.meavox.core.session.backingAudio
 import eu.schicht8.meavox.core.testing.FakeAudioEngine
 import eu.schicht8.meavox.core.testing.FakeLocalFile
 import eu.schicht8.meavox.core.testing.FakePipelineJobs
@@ -237,21 +236,6 @@ class TrackPipelineTest {
         assertEquals(emptyList(), jobs.cancelledSeparations)
         assertEquals(listOf(FakePipelineJobs.Separation(track.id, fast)), jobs.separations)
         assertEquals(running, tracks.get(track.id)?.pipeline)
-    }
-
-    @Test
-    fun `re-separating a Ready Track plays the Original Audio until the new Instrumental is there`() = runTest {
-        startPipeline()
-        val track = import(FakeLocalFile(displayName = "song.mp3", content = "audio-1"))
-        tracks.updatePipeline(track.id, TrackPipelineState.Ready(fast))
-
-        pipeline.reseparate(track.id, best)
-
-        assertEquals(TrackPipelineState.Separating(best), tracks.get(track.id)?.pipeline)
-        assertEquals(FakePipelineJobs.Separation(track.id, best), jobs.separations.last())
-        assertEquals(BackingAudio.OriginalAudio, tracks.get(track.id)!!.backingAudio())
-        tracks.updatePipeline(track.id, TrackPipelineState.Ready(best)) // the job finished
-        assertEquals(BackingAudio.Instrumental(best), tracks.get(track.id)!!.backingAudio())
     }
 
     @Test
