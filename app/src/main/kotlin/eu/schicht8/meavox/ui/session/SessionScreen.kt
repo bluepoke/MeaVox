@@ -7,6 +7,7 @@ import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
@@ -90,6 +93,7 @@ import eu.schicht8.meavox.core.lyrics.MatchLyrics
 import eu.schicht8.meavox.core.lyrics.TrackLyrics
 import eu.schicht8.meavox.core.lyrics.candidate
 import eu.schicht8.meavox.core.mix.ExportMix
+import eu.schicht8.meavox.core.mix.GuideVocalUnavailable
 import eu.schicht8.meavox.core.mix.Mix
 import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.Mixes
@@ -111,6 +115,7 @@ import eu.schicht8.meavox.core.port.InputLevel
 import eu.schicht8.meavox.core.port.LyricsCandidate
 import eu.schicht8.meavox.core.port.Playback
 import eu.schicht8.meavox.core.session.BackingAudio
+import eu.schicht8.meavox.core.session.PracticeLoop
 import eu.schicht8.meavox.core.session.Session
 import eu.schicht8.meavox.core.session.SessionState
 import eu.schicht8.meavox.core.session.Sessions
@@ -213,6 +218,9 @@ fun SessionRoute(
     val offsetMs by viewModel.lyricsOffsetMs.collectAsStateWithLifecycle()
     val karaoke by viewModel.karaoke.collectAsStateWithLifecycle()
     val transpose by viewModel.transpose.collectAsStateWithLifecycle()
+    val practiceLoop by viewModel.practiceLoop.collectAsStateWithLifecycle()
+    val guideVocalLevel by viewModel.guideVocalLevel.collectAsStateWithLifecycle()
+    val guideVocalUnavailable by viewModel.guideVocalUnavailable.collectAsStateWithLifecycle()
     val mixes by viewModel.trackMixes.collectAsStateWithLifecycle()
     val backingExport by viewModel.backingExport.collectAsStateWithLifecycle()
     backingExport?.let { dialog ->
@@ -257,6 +265,9 @@ fun SessionRoute(
             track, loadProgress, state, backing, playback, input, gain, countdown, reviewBacking, takes, trackLyrics, offsetMs, karaoke, transpose,
             modelName = choices::nameOf,
             mixes = mixes,
+            practiceLoop = practiceLoop,
+            guideVocalLevel = guideVocalLevel,
+            guideVocalUnavailable = guideVocalUnavailable,
         ),
         actions = SessionActions(
             onTogglePlay = viewModel::togglePlay,
@@ -288,6 +299,10 @@ fun SessionRoute(
             onEditMix = viewModel::editMix,
             onDeleteMix = viewModel::deleteMix,
             onBackingExport = viewModel::openBackingExport,
+            onMarkLoopStart = viewModel::markLoopStart,
+            onMarkLoopEnd = viewModel::markLoopEnd,
+            onClearLoop = viewModel::clearPracticeLoop,
+            onGuideVocal = viewModel::setGuideVocalLevel,
         ),
     )
 }
@@ -354,6 +369,11 @@ data class SessionContent(
     val modelName: (SeparationModelId) -> String = { it.value },
     /** The Track's Mixes, oldest first (#14). */
     val mixes: List<Mix> = emptyList(),
+    /** The Practice Loop, once A is marked (#18). */
+    val practiceLoop: PracticeLoop? = null,
+    /** The Guide Vocal in the headphones, 0..1, and why it can't be heard now, if it can't (#18). */
+    val guideVocalLevel: Float = 0f,
+    val guideVocalUnavailable: GuideVocalUnavailable? = null,
 )
 
 data class SessionActions(
@@ -386,6 +406,10 @@ data class SessionActions(
     val onEditMix: (Mix) -> Unit = {},
     val onDeleteMix: (MixId) -> Unit = {},
     val onBackingExport: () -> Unit = {},
+    val onMarkLoopStart: () -> Unit = {},
+    val onMarkLoopEnd: () -> Unit = {},
+    val onClearLoop: () -> Unit = {},
+    val onGuideVocal: (Float) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -494,9 +518,14 @@ private fun SessionControls(openError: UiText?, content: SessionContent, actions
         else -> {
             // A Vocal-Free Track has no Instrumental: it always plays its Original Audio (ADR 14).
             if (!track.vocalFree) BackingChoiceRow(track, content.backing, actions.onChooseBacking)
-            Position(content.state, content.playback, actions.onSeek)
+            Position(content.state, content.playback, content.practiceLoop, actions.onSeek)
             Transport(content.state, content.playback, content.reviewBackingDb, actions)
+            PracticeLoopRow(content.practiceLoop, content.state, actions)
             TransposeControl(content.transpose, content.state, actions.onTranspose)
+            GuideVocalControl(
+                content.guideVocalLevel, content.guideVocalUnavailable, R.string.session_guide_vocal_hint,
+                onChange = actions.onGuideVocal,
+            )
             Microphone(content.input, content.inputGainDb, actions.onGain)
             SettingRow(stringResource(R.string.session_countdown, Session.COUNTDOWN_SECONDS), content.countdownEnabled, actions.onCountdown)
             Takes(content.takes, content.state, actions)
@@ -644,7 +673,7 @@ private fun VocalFreeToggle(vocalFree: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun Position(state: SessionState, playback: Playback, onSeek: (Long) -> Unit) {
+private fun Position(state: SessionState, playback: Playback, loop: PracticeLoop?, onSeek: (Long) -> Unit) {
     // While dragging, show the thumb where the finger is; seek once on release.
     var dragMs by remember { mutableStateOf<Float?>(null) }
     val duration = playback.durationMs.coerceAtLeast(1).toFloat()
@@ -670,10 +699,52 @@ private fun Position(state: SessionState, playback: Playback, onSeek: (Long) -> 
             ),
             modifier = Modifier.fillMaxWidth(),
         )
+        loop?.let { LoopRange(it, duration) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatTime(dragMs?.toLong() ?: playback.positionMs), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             Text(formatTime(playback.durationMs), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         }
+    }
+}
+
+/** The Practice Loop's A–B under the position bar, lined up with its track (A alone as a tick). */
+@Composable
+private fun LoopRange(loop: PracticeLoop, durationMs: Float) {
+    val color = MaterialTheme.colorScheme.primary
+    // The slider's track starts and ends half a thumb in from its edges.
+    Canvas(Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(4.dp)) {
+        val start = size.width * (loop.startMs / durationMs).coerceIn(0f, 1f)
+        val end = loop.endMs?.let { size.width * (it / durationMs).coerceIn(0f, 1f) } ?: (start + 2.dp.toPx())
+        drawRect(color, topLeft = Offset(start, 0f), size = Size((end - start).coerceAtLeast(2.dp.toPx()), size.height))
+    }
+}
+
+/**
+ * The Practice Loop (#18, ADR 9): A and B are marked at the current position, while idle; free
+ * playback then repeats A–B. A Take records straight on; the loop stays for afterwards.
+ */
+@Composable
+private fun PracticeLoopRow(loop: PracticeLoop?, state: SessionState, actions: SessionActions) {
+    val idle = state == SessionState.Idle
+    val end = loop?.endMs
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.session_loop), Modifier.weight(1f), style = rowLabel())
+            StepButton(stringResource(R.string.session_loop_a), stringResource(R.string.session_loop_mark_a), enabled = idle, onClick = actions.onMarkLoopStart)
+            StepButton(stringResource(R.string.session_loop_b), stringResource(R.string.session_loop_mark_b), enabled = idle && loop != null, onClick = actions.onMarkLoopEnd)
+            TextButton(onClick = actions.onClearLoop, enabled = loop != null, shape = MeaVoxButtonShape) {
+                Text(stringResource(R.string.session_loop_off))
+            }
+        }
+        Text(
+            when {
+                loop == null -> stringResource(R.string.session_loop_hint)
+                end == null -> stringResource(R.string.session_loop_mark_b_next, formatTime(loop.startMs))
+                else -> stringResource(R.string.session_loop_range, formatTime(loop.startMs), formatTime(end))
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

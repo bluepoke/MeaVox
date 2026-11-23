@@ -175,7 +175,7 @@ internal fun MixEditorSheet(
             }
             NudgeControl(settings.vocalNudgeMs) { actions.onSettings(settings.copy(vocalNudgeMs = it)) }
             VocalEffectsControl(settings.effects) { actions.onSettings(settings.copy(effects = it)) }
-            GuideVocalControl(settings.guideVocalLevel, track.guideVocalUnavailable(mix.backing)) {
+            GuideVocalControl(settings.guideVocalLevel, track.guideVocalUnavailable(mix.backing), R.string.mix_guide_vocal_hint) {
                 actions.onSettings(settings.copy(guideVocalLevel = it))
             }
             // Stored once they stop changing; previewing or exporting stores them too.
@@ -287,11 +287,12 @@ private fun VocalEffects.Reverb.label(): Int = when (this) {
 }
 
 /**
- * The Guide Vocal level (#16), 0 to 100 % of the original vocals, in 5 % steps; disabled with a short
- * reason where the Mix can't have one: on a Vocal-Free Track, or over the Original Audio.
+ * The Guide Vocal level (#16, #18), 0 to 100 % of the original vocals, in 5 % steps, with [hint]; disabled
+ * with a short reason where there is none: on a Vocal-Free Track, or over the Original Audio. In the Mix
+ * Editor and the Session.
  */
 @Composable
-private fun GuideVocalControl(level: Float, unavailable: GuideVocalUnavailable?, onChange: (Float) -> Unit) {
+internal fun GuideVocalControl(level: Float, unavailable: GuideVocalUnavailable?, @StringRes hint: Int, onChange: (Float) -> Unit) {
     val resources = LocalResources.current
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -310,7 +311,7 @@ private fun GuideVocalControl(level: Float, unavailable: GuideVocalUnavailable?,
         Text(
             stringResource(
                 when (unavailable) {
-                    null -> R.string.mix_guide_vocal_hint
+                    null -> hint
                     GuideVocalUnavailable.VocalFree -> R.string.mix_guide_vocal_vocal_free
                     GuideVocalUnavailable.OverOriginalAudio -> R.string.mix_guide_vocal_original
                 },

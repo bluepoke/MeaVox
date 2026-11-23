@@ -17,6 +17,15 @@ internal object NativePlayback {
 
     /** The engine is never destroyed; it lives as long as the process. */
     external fun create(): Long
+
+    /**
+     * An engine without device streams, whose audio callback the caller runs with [renderHeadless]
+     * on its own thread (engine tests). Free it with [destroyHeadless].
+     */
+    external fun createHeadless(): Long
+    /** Runs the audio callback once for [frames] of interleaved stereo [out]. Headless engines only. */
+    external fun renderHeadless(handle: Long, out: FloatArray, frames: Int)
+    external fun destroyHeadless(handle: Long)
     external fun beginLoad(handle: Long, channels: Int, sampleRate: Int, estimatedFrames: Long)
     /** Returns false once the reserved capacity is exhausted: stop decoding. */
     external fun appendLoad(handle: Long, interleaved: FloatArray, frames: Int): Boolean
@@ -27,6 +36,9 @@ internal object NativePlayback {
     external fun seekTo(handle: Long, frame: Long)
     /** Transpose of plain playback in semitones, applied live (ADR 5). */
     external fun setTranspose(handle: Long, semitones: Int)
+    /** The Practice Loop of free playback (#18): from [endMs] on at [startMs]; kept in ms across loads. */
+    external fun setPracticeLoop(handle: Long, startMs: Long, endMs: Long)
+    external fun clearPracticeLoop(handle: Long)
     external fun transport(handle: Long): Int
     external fun isPlaying(handle: Long): Boolean
     external fun positionFrames(handle: Long): Long

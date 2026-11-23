@@ -35,6 +35,18 @@ void withSamples(JNIEnv *env, jfloatArray data, Use use) {
 // Never deleted: lives as long as the process (see PlaybackEngine.h).
 JNI_FN(jlong, create)(JNIEnv *, jobject) { return reinterpret_cast<jlong>(new PlaybackEngine()); }
 
+// Headless engines (tests) are freed by their owner: no device stream can call back into them.
+JNI_FN(jlong, createHeadless)(JNIEnv *, jobject) { return reinterpret_cast<jlong>(new PlaybackEngine(true)); }
+
+JNI_FN(void, renderHeadless)(JNIEnv *env, jobject, jlong h, jfloatArray out, jint frames) {
+    jfloat *samples = env->GetFloatArrayElements(out, nullptr);
+    if (!samples) return;
+    engine(h).renderHeadless(samples, frames);
+    env->ReleaseFloatArrayElements(out, samples, 0);  // copy back
+}
+
+JNI_FN(void, destroyHeadless)(JNIEnv *, jobject, jlong h) { delete reinterpret_cast<PlaybackEngine *>(h); }
+
 JNI_FN(void, beginLoad)(JNIEnv *, jobject, jlong h, jint channels, jint sampleRate, jlong estimatedFrames) {
     engine(h).beginLoad(channels, sampleRate, estimatedFrames);
 }
@@ -56,6 +68,12 @@ JNI_FN(void, pause)(JNIEnv *, jobject, jlong h) { engine(h).pause(); }
 JNI_FN(void, seekTo)(JNIEnv *, jobject, jlong h, jlong frame) { engine(h).seekTo(frame); }
 
 JNI_FN(void, setTranspose)(JNIEnv *, jobject, jlong h, jint semitones) { engine(h).setTranspose(semitones); }
+
+JNI_FN(void, setPracticeLoop)(JNIEnv *, jobject, jlong h, jlong startMs, jlong endMs) {
+    engine(h).setPracticeLoop(startMs, endMs);
+}
+
+JNI_FN(void, clearPracticeLoop)(JNIEnv *, jobject, jlong h) { engine(h).clearPracticeLoop(); }
 
 JNI_FN(jint, transport)(JNIEnv *, jobject, jlong h) { return static_cast<jint>(engine(h).transport()); }
 

@@ -3,6 +3,7 @@ package eu.schicht8.meavox.core.session
 
 import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.library.TrackRepository
+import eu.schicht8.meavox.core.mix.GuideVocalUnavailable
 import eu.schicht8.meavox.core.mix.Mix
 import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.MixParts
@@ -11,8 +12,10 @@ import eu.schicht8.meavox.core.mix.Mixes
 import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.mix.alignmentFrames
 import eu.schicht8.meavox.core.mix.fileOf
+import eu.schicht8.meavox.core.mix.guideVocalUnavailable
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.BackingChoice
+import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.Take
 import eu.schicht8.meavox.core.model.TakeId
@@ -165,6 +168,71 @@ class Session private constructor(
         }
     }
 
+    // --- Practice Loop (#18, ADR 9) ---
+
+    private val _practiceLoop = MutableStateFlow<PracticeLoop?>(null)
+
+    /** The Practice Loop, once A is marked; it loops once B is marked too. Not kept after the Session. */
+    val practiceLoop: StateFlow<PracticeLoop?> = _practiceLoop
+
+    /**
+     * Marks A at the current position (only while [SessionState.Idle]). A B less than
+     * [MIN_LOOP_MS] after it is dropped.
+     */
+    suspend fun markLoopStart() = mutex.withLock {
+        if (_state.value != SessionState.Idle) return@withLock
+        val start = engine.playback.value.positionMs
+        setPracticeLoopLocked(PracticeLoop(start, _practiceLoop.value?.endMs?.takeIf { it - start >= MIN_LOOP_MS }))
+    }
+
+    /**
+     * Marks B at the current position (only while [SessionState.Idle]), and free playback goes on
+     * from A. Returns false, and changes nothing, without an A or less than [MIN_LOOP_MS] after it.
+     */
+    suspend fun markLoopEnd(): Boolean = mutex.withLock {
+        if (_state.value != SessionState.Idle) return@withLock false
+        val start = _practiceLoop.value?.startMs ?: return@withLock false
+        val end = engine.playback.value.positionMs
+        if (end - start < MIN_LOOP_MS) return@withLock false
+        setPracticeLoopLocked(PracticeLoop(start, end))
+        engine.seekTo(start)
+        true
+    }
+
+    /** Ends the Practice Loop: free playback plays on past B again. */
+    suspend fun clearPracticeLoop() = mutex.withLock { setPracticeLoopLocked(null) }
+
+    private fun setPracticeLoopLocked(loop: PracticeLoop?) {
+        _practiceLoop.value = loop
+        val end = loop?.endMs
+        if (end != null) engine.setPracticeLoop(loop.startMs, end) else engine.clearPracticeLoop()
+    }
+
+    // --- Guide Vocal (#18, ADR 9) ---
+
+    private val _guideVocalLevel = MutableStateFlow(0f)
+
+    /**
+     * The Guide Vocal in the headphones: the Vocal Stem of the Instrumental that plays, transposed
+     * with it, from 0 (none, as every Session starts) to 1 (as in the Original Audio). Never recorded,
+     * and silent while recording without headphones.
+     */
+    val guideVocalLevel: StateFlow<Float> = _guideVocalLevel
+
+    /** The Track as the Session last saw it (Vocal-Free, Backing Audio choice). */
+    private var latestTrack = track
+
+    private val _guideVocalUnavailable = MutableStateFlow(track.guideVocalUnavailable(_backing.value))
+
+    /** Why the Guide Vocal can't be heard now, if it can't: on a Vocal-Free Track, or over the Original Audio. */
+    val guideVocalUnavailable: StateFlow<GuideVocalUnavailable?> = _guideVocalUnavailable
+
+    /** Sets the Guide Vocal level; it is heard at once during free playback. */
+    suspend fun setGuideVocalLevel(level: Float) = mutex.withLock {
+        _guideVocalLevel.value = level.coerceIn(0f, 1f)
+        applyGuideVocalLocked()
+    }
+
     // --- Microphone ---
 
     /**
@@ -297,6 +365,7 @@ class Session private constructor(
         if (!engine.loadTake(deps.files.take(track.id, stored.id), stored.startFrame)) return@withLock false
         // Until Latency Calibration (#9), alignment uses the engine's estimate from recording.
         _state.value = SessionState.PlayingTake(stored)
+        applyGuideVocalLocked()
         if (!engine.playTake(stored.reportedLatencyFrames, stored.transpose)) {
             becomeIdleLocked()
             return@withLock false
@@ -385,7 +454,7 @@ class Session private constructor(
         val wanted = parts.guideVocal(deps.files, settings)
         if (wanted != null && wanted != guideVocal) {
             // Decoded far enough to play from where the preview is now (its start, or later when raised during it).
-            val at = maxOf(parts.take.startFrame, engine.playback.value.positionMs * parts.take.sampleRate / 1000)
+            val at = maxOf(parts.take.startPositionMs, engine.playback.value.positionMs)
             if (engine.loadGuideVocal(wanted, at)) guideVocal = wanted
         }
         engine.setGuideVocalLevel(if (wanted != null && wanted == guideVocal) settings.guideVocalLevel else 0f)
@@ -462,6 +531,9 @@ class Session private constructor(
     /** Starts recording a Take at the Transpose the control is set to now. */
     private suspend fun startRecordingLocked(fromMs: Long) {
         val transpose = _transpose.value
+        // Over anything but headphones, the microphone could pick the Guide Vocal up (#18).
+        recordingOverHeadphones = engine.currentOutputRoute() in HEADPHONES
+        if (!recordingOverHeadphones) engine.setGuideVocalLevel(0f)
         if (!engine.startRecording(fromMs, transpose)) {
             becomeIdleLocked()
             throw MicrophoneUnavailable()
@@ -479,6 +551,7 @@ class Session private constructor(
             return
         }
         _state.value = SessionState.Review(take, recording.transpose)
+        applyGuideVocalLocked()
         engine.playTake(take.reportedLatencyFrames, recording.transpose)
     }
 
@@ -494,7 +567,9 @@ class Session private constructor(
      */
     private suspend fun becomeIdleLocked(positionMs: Long? = null) {
         _state.value = SessionState.Idle
-        switchBackingLocked(wantedBacking, positionMs ?: engine.playback.value.positionMs, resume = false)
+        val position = positionMs ?: engine.playback.value.positionMs
+        switchBackingLocked(wantedBacking, position, resume = false)
+        applyGuideVocalLocked(position)
     }
 
     /** Loads [backing] and continues at [positionMs]; the stems are sample-aligned with the Original Audio. */
@@ -503,6 +578,43 @@ class Session private constructor(
         loadBacking(backing)
         engine.seekTo(positionMs)
         if (resume) engine.play()
+    }
+
+    /**
+     * The Session's Guide Vocal as the Session is now, heard only where the singer listens without
+     * recording it; a Mix Preview sets its own. The Vocal Stem is loaded the first time the level is
+     * raised, and only while Idle, as decoding it holds up the Session; it stays held at level 0, and
+     * goes when the Instrumental does.
+     */
+    private suspend fun applyGuideVocalLocked(positionMs: Long = engine.playback.value.positionMs) {
+        val state = _state.value
+        if (state is SessionState.PreviewingMix) return
+        val stem = availableVocalStem()
+        when {
+            stem == null -> {
+                if (guideVocal != null) engine.clearGuideVocal()
+                guideVocal = null
+            }
+            stem != guideVocal && _guideVocalLevel.value > 0f && state == SessionState.Idle ->
+                guideVocal = if (engine.loadGuideVocal(stem, positionMs)) stem else null
+        }
+        // Review and kept Takes play as recorded, without it (ADR 7).
+        val audible = when (state) {
+            SessionState.Idle, is SessionState.CountingDown -> true
+            is SessionState.Recording -> recordingOverHeadphones
+            else -> false
+        }
+        engine.setGuideVocalLevel(if (audible && stem != null && stem == guideVocal) _guideVocalLevel.value else 0f)
+    }
+
+    /** The Take being recorded goes out over headphones: the Guide Vocal may be heard meanwhile. */
+    private var recordingOverHeadphones = false
+
+    /** The Vocal Stem of the Instrumental that plays, if the Track can have a Guide Vocal now. */
+    private fun availableVocalStem(): AudioFile? {
+        val instrumental = _backing.value as? BackingAudio.Instrumental ?: return null
+        if (latestTrack.guideVocalUnavailable(instrumental) != null) return null
+        return deps.files.stems(track.id, instrumental.model).vocalStem
     }
 
     private suspend fun nextTakeName(): String {
@@ -527,7 +639,10 @@ class Session private constructor(
 
     private suspend fun loadBacking(backing: BackingAudio, onProgress: (Float) -> Unit = {}) {
         load = engine.load(fileOf(backing), onProgress)
+        // The engine dropped the Guide Vocal with the Backing Audio it belonged to.
+        guideVocal = null
         _backing.value = backing
+        _guideVocalUnavailable.value = latestTrack.guideVocalUnavailable(backing)
     }
 
     private fun observe() {
@@ -558,14 +673,19 @@ class Session private constructor(
             }
         }
         observers.launch {
-            // Separation finished (ADR 10) or the user chose other Backing Audio: switch, but never
-            // under a Take that is being recorded, reviewed or played back.
-            deps.tracks.observe(track.id).filterNotNull().map { it.backingAudio() }.distinctUntilChanged().collect { backing ->
+            // Separation finished (ADR 10), the user chose other Backing Audio or marked the Track
+            // Vocal-Free: switch, but never under a Take that is being recorded, reviewed or played back.
+            deps.tracks.observe(track.id).filterNotNull().distinctUntilChanged { a, b ->
+                a.backingAudio() == b.backingAudio() && a.vocalFree == b.vocalFree
+            }.collect { now ->
                 mutex.withLock {
-                    wantedBacking = backing
+                    latestTrack = now
+                    wantedBacking = now.backingAudio()
+                    _guideVocalUnavailable.value = now.guideVocalUnavailable(_backing.value)
                     if (_state.value == SessionState.Idle) {
-                        val now = engine.playback.value
-                        switchBackingLocked(backing, now.positionMs, resume = now.playing)
+                        val playback = engine.playback.value
+                        switchBackingLocked(wantedBacking, playback.positionMs, resume = playback.playing)
+                        applyGuideVocalLocked(playback.positionMs)
                     }
                 }
             }
@@ -590,6 +710,12 @@ class Session private constructor(
         const val DEFAULT_REVIEW_BACKING_DB = -20f
         const val MIN_REVIEW_BACKING_DB = -40f
 
+        /** Outputs the microphone can't pick up: the Guide Vocal plays on while recording over them. */
+        private val HEADPHONES = setOf(OutputRoute.Wired, OutputRoute.Usb, OutputRoute.Bluetooth)
+
+        /** The shortest Practice Loop. */
+        const val MIN_LOOP_MS = 1_000L
+
         /** Backing Audio decoded past a Take's Start Position before its Mix Preview starts. */
         private const val PREVIEW_BUFFER_MS = 2_000L
 
@@ -606,6 +732,12 @@ fun Track.backingAudio(): BackingAudio {
     val model = instrumentalModel
     return if (model != null && backingChoice == BackingChoice.Instrumental) BackingAudio.Instrumental(model) else BackingAudio.OriginalAudio
 }
+
+/**
+ * An A–B section of the Track that free playback repeats, without recording (GLOSSARY: Practice
+ * Loop). Until B is marked, [endMs] is null and nothing loops.
+ */
+data class PracticeLoop(val startMs: Long, val endMs: Long? = null)
 
 /** What plays under the singer in a Session (GLOSSARY: Backing Audio). */
 sealed interface BackingAudio {

@@ -22,6 +22,9 @@ constexpr float kClipLevel = 0.999f;
 constexpr int64_t kTakeHeadroomSeconds = 5;          // recording may outlast an estimated duration
 constexpr int kFlacBitsPerSample = 24;
 constexpr int kFlacChunkFrames = 4096;
+constexpr int64_t kLoopFadeDivisor = 100;  // the fade before B: 10 ms
+// What BackingRenderer may read of a Practice Loop: it never ends.
+constexpr int64_t kLoopedReadable = INT64_MAX / 4;
 }  // namespace
 
 PlaybackEngine::~PlaybackEngine() {
@@ -37,11 +40,62 @@ void PlaybackEngine::freeBlocksLocked() {
     freeGuideLocked();  // it belongs to the Backing Audio
 }
 
-// Only while the callback doesn't read the Guide Vocal: the stream is closed or the Take doesn't play.
+// Only while the callback doesn't read the Guide Vocal: the stream is closed, or after releaseGuideLocked().
 void PlaybackEngine::freeGuideLocked() {
     mGuideDecoded.store(0);
     for (float *block : mGuideBlocks) delete[] block;
     std::vector<float *>().swap(mGuideBlocks);
+}
+
+// Stops the callback reading the Guide Vocal, then frees it, without interrupting playback.
+void PlaybackEngine::releaseGuideLocked() {
+    mGuideAck.store(false);
+    mGuideDecoded.store(0, std::memory_order_release);
+    for (int i = 0; mStream && i < 100 && !mGuideAck.load(std::memory_order_acquire); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    if (mStream && !mGuideAck.load()) LOGW("audio thread did not let go of the Guide Vocal within 200 ms");
+    freeGuideLocked();
+}
+
+PlaybackEngine::LoopedFrames::LoopedFrames() : mScratch(static_cast<size_t>(kScratchFrames) * 2) {}
+
+const float *PlaybackEngine::LoopedFrames::at(int64_t frame, int64_t &contiguous) const {
+    const int64_t length = mEnd - mStart;
+    const int64_t f = frame >= mEnd ? mStart + (frame - mStart) % length : frame;
+    const int64_t fadeFrom = mEnd - mFade;
+    if (f < fadeFrom) {
+        const float *frames = mInner->at(f, contiguous);
+        contiguous = std::min(contiguous, fadeFrom - f);
+        return frames;
+    }
+    // Fading over to the frames as far before A as these are before B; before the Track's start, to silence.
+    int64_t available = 0;
+    const float *here = mInner->at(f, available);
+    const int64_t n = std::min({available, mEnd - f, kScratchFrames});
+    std::copy_n(here, static_cast<size_t>(n) * 2, mScratch.begin());  // the inner source may reuse its buffer
+    for (int64_t i = 0; i < n;) {
+        const int64_t before = f + i - length;
+        int64_t m = n - i;
+        const float *there = nullptr;
+        if (before >= 0) {
+            int64_t thereContiguous = 0;
+            there = mInner->at(before, thereContiguous);
+            m = std::min(m, thereContiguous);
+        } else {
+            m = std::min(m, -before);
+        }
+        for (int64_t k = 0; k < m; ++k) {
+            const float w = static_cast<float>(f + i + k - fadeFrom + 1) / static_cast<float>(mFade);
+            for (int c = 0; c < 2; ++c) {
+                float &sample = mScratch[static_cast<size_t>((i + k) * 2 + c)];
+                sample = sample * (1.0f - w) + (there ? there[k * 2 + c] * w : 0.0f);
+            }
+        }
+        i += m;
+    }
+    contiguous = n;
+    return mScratch.data();
 }
 
 PlaybackEngine::GuidedFrames::GuidedFrames(const StereoFrames &backing, const StereoFrames &guide)
@@ -79,6 +133,7 @@ void PlaybackEngine::beginLoad(int channels, int sampleRate, int64_t estimatedFr
     mBlocks.reserve(static_cast<size_t>(maxBlocks));
     mLoadChannels = std::max(1, channels);
     mSampleRate.store(sampleRate);
+    applyPracticeLoopLocked();  // at this file's rate
     configureStretchLocked(sampleRate);
     // A Session keeps its streams running, now at the new file's rate.
     if (mSession) openSessionStreamsLocked();
@@ -186,6 +241,34 @@ void PlaybackEngine::setTranspose(int semitones) {
     mPlayTranspose.store(std::clamp(semitones, -kMaxTranspose, kMaxTranspose));
 }
 
+void PlaybackEngine::setPracticeLoop(int64_t startMs, int64_t endMs) {
+    std::lock_guard<std::mutex> lock(mControlMutex);
+    mLoopStartMs = startMs;
+    mLoopEndMs = endMs;
+    applyPracticeLoopLocked();
+}
+
+void PlaybackEngine::clearPracticeLoop() { setPracticeLoop(0, 0); }
+
+void PlaybackEngine::applyPracticeLoopLocked() {
+    const int64_t rate = mSampleRate.load();
+    const int64_t start = mLoopStartMs * rate / 1000;
+    const int64_t end = mLoopEndMs * rate / 1000;
+    if (rate <= 0 || start < 0 || end <= start || end > UINT32_MAX) {
+        mLoop.store(0);
+        return;
+    }
+    mLoop.store(static_cast<int64_t>((static_cast<uint64_t>(start) << 32) | static_cast<uint64_t>(end)));
+}
+
+bool PlaybackEngine::practiceLoop(int64_t &start, int64_t &end) const {
+    const auto packed = static_cast<uint64_t>(mLoop.load(std::memory_order_relaxed));
+    if (packed == 0) return false;
+    start = static_cast<int64_t>(packed >> 32);
+    end = static_cast<int64_t>(packed & 0xffffffffu);
+    return true;
+}
+
 void PlaybackEngine::seekTo(int64_t frame) {
     const int64_t clamped = std::clamp<int64_t>(frame, 0, std::max<int64_t>(durationFrames(), 0));
     // Position first: a callback that consumes the request then stores a later position.
@@ -198,7 +281,7 @@ void PlaybackEngine::seekTo(int64_t frame) {
 // ---------------------------------------------------------------------------------------------
 
 bool PlaybackEngine::startStreamLocked() {
-    if (mStream) return true;
+    if (mHeadless || mStream) return true;
     if (mSession) return openSessionStreamsLocked();
     oboe::AudioStreamBuilder builder;
     builder.setDirection(oboe::Direction::Output)
@@ -233,6 +316,7 @@ bool PlaybackEngine::startStreamLocked() {
 // matters for Monitoring; Takes are aligned by timestamps and Latency Calibration (ADR 16).
 bool PlaybackEngine::openSessionStreamsLocked() {
     closeStreamLocked();
+    if (mHeadless) return true;
     const int32_t rate = mSampleRate.load();
     if (rate <= 0) return false;  // nothing loaded yet; opened by the next load
 
@@ -353,7 +437,9 @@ void PlaybackEngine::setSessionMode(bool enabled) {
         openSessionStreamsLocked();
     } else {
         mInputWanted = false;
-        mPlayTranspose.store(0);  // Transpose belongs to the Session; plain playback is untouched
+        mPlayTranspose.store(0);  // Transpose and the Practice Loop belong to the Session; plain playback is untouched
+        mLoopStartMs = mLoopEndMs = 0;
+        applyPracticeLoopLocked();
         std::vector<float>().swap(mTake);
         mTakeFrames.store(0);
     }
@@ -502,8 +588,7 @@ void PlaybackEngine::setVocalEffects(VocalEffects effects, int64_t tailFrames) {
 
 bool PlaybackEngine::beginGuideLoad(int channels, int sampleRate) {
     std::lock_guard<std::mutex> lock(mControlMutex);
-    if (mTransport.load() == Transport::PlayingTake && mGuideDecoded.load() > 0) enterIdleLocked();
-    freeGuideLocked();
+    releaseGuideLocked();
     if (sampleRate != mSampleRate.load()) {
         LOGW("Guide Vocal at %d Hz does not match the Backing Audio at %d Hz", sampleRate, mSampleRate.load());
         return false;
@@ -540,9 +625,8 @@ bool PlaybackEngine::appendGuideLoad(const float *interleaved, int frames) {
 
 void PlaybackEngine::clearGuide() {
     std::lock_guard<std::mutex> lock(mControlMutex);
-    if (mTransport.load() == Transport::PlayingTake) enterIdleLocked();
     mGuideChannels = 0;
-    freeGuideLocked();
+    releaseGuideLocked();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -617,12 +701,19 @@ void PlaybackEngine::trackXRuns() {
     mBacklogFloor = std::min(mBacklogFloor, backlog);
 }
 
+void PlaybackEngine::renderHeadless(float *out, int32_t frames) {
+    if (mHeadless) onAudioReady(nullptr, out, frames);
+}
+
 oboe::DataCallbackResult PlaybackEngine::onAudioReady(oboe::AudioStream *, void *audioData, int32_t numFrames) {
     auto *out = static_cast<float *>(audioData);
     // Completion first: if it is set, the decoded count read after it is final (see endLoad()).
     const bool complete = mComplete.load(std::memory_order_acquire);
     const int64_t decoded = mDecoded.load(std::memory_order_acquire);
     const Transport transport = mTransport.load(std::memory_order_acquire);
+    // Seeing no Guide Vocal, this callback won't read its blocks: releaseGuideLocked() may free them.
+    const int64_t guideDecoded = mGuideDecoded.load(std::memory_order_acquire);
+    if (guideDecoded == 0) mGuideAck.store(true, std::memory_order_release);
     // While recording, also catch up on input that arrived late in earlier callbacks.
     const int64_t want = numFrames + (transport == Transport::Recording ? mTakeDeficit : 0);
     const int numIn = readInput(static_cast<int>(std::min<int64_t>(want, INT32_MAX)));
@@ -638,15 +729,27 @@ oboe::DataCallbackResult PlaybackEngine::onAudioReady(oboe::AudioStream *, void 
     // Plain playback follows the Transpose control live; a Take keeps the one it started with.
     const int transpose = transport == Transport::Playing ? mPlayTranspose.load(std::memory_order_relaxed)
                                                           : mTransportTranspose.load(std::memory_order_relaxed);
-    // A Mix Preview's Guide Vocal joins the Backing Audio before the stretcher (#16).
-    const int64_t guideDecoded = mGuideDecoded.load(std::memory_order_acquire);
+    // The Guide Vocal joins the Backing Audio before the stretcher (#16, #18); the microphone never hears it.
     const float guideLevel = mGuideLevel.load(std::memory_order_relaxed);
-    const bool guided = transport == Transport::PlayingTake && guideDecoded > 0 && guideLevel > 0.0f;
+    const bool guided = guideDecoded > 0 && guideLevel > 0.0f;
     if (guided) mGuided.prepare(guideDecoded, guideLevel);
-    const StereoFrames &source = guided ? static_cast<const StereoFrames &>(mGuided) : mBlockFrames;
-    const int32_t written = mBacking.render(source, start, decoded, complete, seek >= 0, transpose, out, numFrames);
+    const StereoFrames *source = guided ? static_cast<const StereoFrames *>(&mGuided) : &mBlockFrames;
+    // The Practice Loop: free playback before B goes on at A (#18).
+    int64_t loopStart = 0;
+    int64_t loopEnd = 0;
+    const bool looping = transport == Transport::Playing && practiceLoop(loopStart, loopEnd) && loopEnd <= decoded &&
+                         start < loopEnd;
+    if (looping) {
+        const int64_t fade = std::min<int64_t>(mSampleRate.load(std::memory_order_relaxed) / kLoopFadeDivisor,
+                                               (loopEnd - loopStart) / 2);
+        mLooped.prepare(*source, loopStart, loopEnd, std::max<int64_t>(fade, 1));
+        source = &mLooped;
+    }
+    const int32_t written = mBacking.render(*source, start, looping ? kLoopedReadable : decoded, complete || looping,
+                                            seek >= 0, transpose, out, numFrames);
     int64_t pos = start + written;
-    bool finished = complete && pos >= decoded;
+    if (looping && pos >= loopEnd) pos = loopStart + (pos - loopStart) % (loopEnd - loopStart);
+    bool finished = !looping && complete && pos >= decoded;
 
     if (transport == Transport::Recording) {
         // Sample i is what came in while timeline frame mTakeStart + i went out. Input is written

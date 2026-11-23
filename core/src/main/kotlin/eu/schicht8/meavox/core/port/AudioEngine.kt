@@ -46,6 +46,15 @@ interface AudioEngine {
     // --- Session face (ADR 4, ADR 9) ---
 
     /**
+     * The Practice Loop (#18): free playback that reaches [endMs] goes on from [startMs] without a
+     * gap, until [clearPracticeLoop]. Playback from past [endMs], recording and Take playback run
+     * straight on. Kept across [load] calls; [endSession] ends it.
+     */
+    fun setPracticeLoop(startMs: Long, endMs: Long)
+
+    fun clearPracticeLoop()
+
+    /**
      * Switches to Session audio (streams that keep running, microphone) until [endSession]. The loaded audio stays loaded,
      * and later [load] calls stay in Session audio.
      */
@@ -62,6 +71,9 @@ interface AudioEngine {
      * microphone permission. Returns false if the microphone can't be opened.
      */
     suspend fun enableMicrophone(): Boolean
+
+    /** Where the Session's output goes now, e.g. to decide what may be heard while recording. */
+    suspend fun currentOutputRoute(): OutputRoute
 
     /** Digital gain applied to the microphone before metering and recording, in dB. */
     fun setInputGain(gainDb: Float)
@@ -129,10 +141,12 @@ interface AudioEngine {
 
     /**
      * Blends [file], a Vocal Stem sample-aligned with the loaded Instrumental, into the Backing Audio
-     * as the Guide Vocal, before it is transposed, at the level [setGuideVocalLevel] sets. Returns
-     * once it is decoded past [fromFrame], or false if it can't be read or its rate doesn't match.
+     * as the Guide Vocal, before it is transposed, at the level [setGuideVocalLevel] sets: in free
+     * playback, recording and Take playback alike, never into the recorded Take. Loading it doesn't
+     * interrupt playback. Returns once it is decoded past [fromMs], or false if it can't be read or
+     * its rate doesn't match. [load] drops it.
      */
-    suspend fun loadGuideVocal(file: AudioFile, fromFrame: Long): Boolean
+    suspend fun loadGuideVocal(file: AudioFile, fromMs: Long): Boolean
 
     /** Level of the Guide Vocal against the Backing Audio, 0..1 (see [eu.schicht8.meavox.core.mix.MixSettings.guideVocalLevel]); 0 until set. */
     fun setGuideVocalLevel(level: Float)

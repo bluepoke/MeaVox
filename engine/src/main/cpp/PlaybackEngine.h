@@ -18,11 +18,19 @@
 // sample-aligned with the timeline. Plain playback follows setTranspose live; a recording and Take
 // playback keep the Transpose they were started with.
 //
+// Practice Loop (#18): free playback that reaches B goes on at A, through the same BackingRenderer, so
+// a transposed loop is as seamless as a plain one.
+//
+// Headless (engine tests): no device streams; the caller runs the audio callback with renderHeadless()
+// on its own thread, so the PCM played can be asserted.
+//
 // Threading: public methods may be called from any non-audio thread; mutating ones are
-// serialised by mControlMutex. Blocks are freed only while the stream is closed. The Take
-// buffer is changed only while the transport is idle and the callback has acknowledged it
-// (enterIdleLocked). One instance lives as long as the process (it is never destroyed while
-// Oboe's error thread could still call back into it).
+// serialised by mControlMutex. The Backing Audio's blocks are freed only while the stream is
+// closed; the Guide Vocal's once the callback has acknowledged it no longer reads them
+// (releaseGuideLocked), so it comes and goes during playback. The Take buffer is changed only while
+// the transport is idle and the callback has acknowledged it (enterIdleLocked). The app's instance
+// lives as long as the process (it is never destroyed while Oboe's error thread could still call
+// back into it); a headless one, which has no streams, is freed by its owner.
 #pragma once
 
 #include <oboe/Oboe.h>
@@ -47,8 +55,11 @@ enum class Transport : int32_t {
 
 class PlaybackEngine : public oboe::AudioStreamDataCallback, public oboe::AudioStreamErrorCallback {
 public:
-    PlaybackEngine() = default;
+    explicit PlaybackEngine(bool headless = false) : mHeadless(headless) {}
     ~PlaybackEngine() override;
+
+    // Headless only: runs the audio callback once for [frames] of interleaved stereo [out].
+    void renderHeadless(float *out, int32_t frames);
 
     // Starts a new load (stopping playback and releasing the previous song and Take first):
     // decoded PCM at the file's own rate, 1..n channels interleaved. [estimatedFrames] (0 if
@@ -67,6 +78,11 @@ public:
     void seekTo(int64_t frame);
     // Transpose of plain playback in semitones (−6…+6), applied live; reset when the Session ends.
     void setTranspose(int semitones);
+    // Practice Loop (#18): free playback before [endMs] goes on at [startMs] once it reaches it,
+    // without a gap. Applied live, and kept in ms across loads (each file's rate may differ); cleared
+    // when the Session ends.
+    void setPracticeLoop(int64_t startMs, int64_t endMs);
+    void clearPracticeLoop();
 
     // --- Session mode ---
     // Entering opens low-latency streams that keep running; leaving closes the microphone and
@@ -94,12 +110,13 @@ public:
     // Writes the held Take as mono 24-bit FLAC. False on I/O or encoder errors.
     bool writeTakeFlac(const std::string &path);
 
-    // --- Mix Preview (#16) ---
+    // --- Mix Preview (#16) and the Guide Vocal (#16, #18) ---
     // Vocal Effects on the held Take while it plays, applied live (none until set). Take playback
     // runs on [tailFrames] past the Take's end, so a reverb rings out.
     void setVocalEffects(VocalEffects effects, int64_t tailFrames);
     // Starts loading the Guide Vocal: a Vocal Stem at the Backing Audio's rate, added to it before
-    // the stretcher while the held Take plays. Drops one held before. False if the rate doesn't match.
+    // the stretcher in every transport (never into the recorded Take). Drops one held before, without
+    // interrupting playback. False if the rate doesn't match.
     bool beginGuideLoad(int channels, int sampleRate);
     // Returns false once the reserved capacity is exhausted (the rest is dropped; stop decoding).
     bool appendGuideLoad(const float *interleaved, int frames);
@@ -151,6 +168,29 @@ private:
         const std::vector<float *> &mBlocks;
     };
 
+    // Free playback within the Practice Loop, as BackingRenderer reads it (#18): from B on, the frames
+    // from A again, so the stretcher's read-ahead wraps with it. The last frames before B fade over to
+    // those just before A, so going on at A continues the sound without a click. Callback only, after prepare().
+    class LoopedFrames : public StereoFrames {
+    public:
+        LoopedFrames();
+        void prepare(const StereoFrames &inner, int64_t start, int64_t end, int64_t fade) {
+            mInner = &inner;
+            mStart = start;
+            mEnd = end;
+            mFade = fade;
+        }
+        const float *at(int64_t frame, int64_t &contiguous) const override;
+
+    private:
+        static constexpr int64_t kScratchFrames = 4096;
+        const StereoFrames *mInner = nullptr;
+        int64_t mStart = 0;
+        int64_t mEnd = 0;
+        int64_t mFade = 0;
+        mutable std::vector<float> mScratch;  // one fade at a time, like GuidedFrames
+    };
+
     // The Backing Audio with the Guide Vocal added at a level, as BackingRenderer reads it (#16): summed
     // before the stretcher, so the Guide Vocal is transposed with it. Callback only, after prepare().
     class GuidedFrames : public StereoFrames {
@@ -176,6 +216,9 @@ private:
     void closeStreamLocked();
     void freeBlocksLocked();
     void freeGuideLocked();
+    void releaseGuideLocked();
+    bool practiceLoop(int64_t &start, int64_t &end) const;
+    void applyPracticeLoopLocked();
     void enterIdleLocked();
     bool startTransportLocked(int64_t fromFrame, Transport transport, int transpose);
     void configureStretchLocked(int32_t sampleRate);
@@ -184,6 +227,7 @@ private:
     int readInput(int numFrames);
     void trackXRuns();
 
+    const bool mHeadless = false;
     std::mutex mControlMutex;
     std::shared_ptr<oboe::AudioStream> mStream;
     std::shared_ptr<oboe::AudioStream> mInput;
@@ -208,6 +252,13 @@ private:
     std::atomic<int32_t> mTransportTranspose{0};  // recording and Take playback, fixed at their start
     BlockFrames mBlockFrames{mBlocks};
     BackingRenderer mBacking;
+
+    // Practice Loop as set, in ms (none if the end isn't after the start), and as the callback reads
+    // it: start << 32 | end in frames at the loaded rate, 0 for none (one atomic, so it never sees half a change).
+    int64_t mLoopStartMs = 0;
+    int64_t mLoopEndMs = 0;
+    std::atomic<int64_t> mLoop{0};
+    LoopedFrames mLooped;
 
     // Session mode.
     bool mSession = false;
@@ -240,9 +291,11 @@ private:
     VocalChain mEffects;
     std::atomic<int32_t> mEffectsBits{0};
     std::atomic<int64_t> mTakeTail{0};
-    // Guide Vocal blocks, like mBlocks; read by the callback only while the Take plays and below mGuideDecoded.
+    // Guide Vocal blocks, like mBlocks; read by the callback below mGuideDecoded. The callback sets
+    // mGuideAck once it sees none decoded, so releaseGuideLocked() knows the blocks are no longer read.
     std::vector<float *> mGuideBlocks;
     std::atomic<int64_t> mGuideDecoded{0};
+    std::atomic<bool> mGuideAck{false};
     int32_t mGuideChannels = 0;  // > 0 while a Guide Vocal load is in progress
     std::atomic<float> mGuideLevel{0.0f};
     BlockFrames mGuideBlockFrames{mGuideBlocks};

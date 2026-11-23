@@ -13,6 +13,7 @@ import eu.schicht8.meavox.core.lyrics.LyricsRepository
 import eu.schicht8.meavox.core.lyrics.MatchLyrics
 import eu.schicht8.meavox.core.lyrics.TrackLyrics
 import eu.schicht8.meavox.core.mix.ExportMix
+import eu.schicht8.meavox.core.mix.GuideVocalUnavailable
 import eu.schicht8.meavox.core.mix.Mix
 import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.MixSettings
@@ -33,6 +34,7 @@ import eu.schicht8.meavox.core.port.InputLevel
 import eu.schicht8.meavox.core.port.Playback
 import eu.schicht8.meavox.core.session.BackingAudio
 import eu.schicht8.meavox.core.session.MicrophoneUnavailable
+import eu.schicht8.meavox.core.session.PracticeLoop
 import eu.schicht8.meavox.core.session.Session
 import eu.schicht8.meavox.core.session.SessionState
 import eu.schicht8.meavox.core.session.Sessions
@@ -188,6 +190,9 @@ class SessionViewModel(
     val reviewBackingDb: StateFlow<Float> = from(Session.DEFAULT_REVIEW_BACKING_DB) { it.reviewBackingDb }
     val takes: StateFlow<List<Take>> = from(emptyList()) { it.takes }
     val transpose: StateFlow<Transpose> = from(Transpose.None) { it.transpose }
+    val practiceLoop: StateFlow<PracticeLoop?> = from(null) { it.practiceLoop }
+    val guideVocalLevel: StateFlow<Float> = from(0f) { it.guideVocalLevel }
+    val guideVocalUnavailable: StateFlow<GuideVocalUnavailable?> = from(null) { it.guideVocalUnavailable }
 
     init {
         viewModelScope.launch {
@@ -253,6 +258,18 @@ class SessionViewModel(
     fun setReviewBackingDb(gainDb: Float) = act { it.setReviewBackingDb(gainDb) }
 
     fun setTranspose(transpose: Transpose) = act { it.setTranspose(transpose) }
+
+    /** Marks A of the Practice Loop at the current position (#18). */
+    fun markLoopStart() = act { it.markLoopStart() }
+
+    /** Marks B of the Practice Loop at the current position; it must come at least a second after A. */
+    fun markLoopEnd() = act {
+        if (!it.markLoopEnd()) _message.value = UiText.of(R.string.session_loop_too_short, (Session.MIN_LOOP_MS / 1000).toInt())
+    }
+
+    fun clearPracticeLoop() = act { it.clearPracticeLoop() }
+
+    fun setGuideVocalLevel(level: Float) = act { it.setGuideVocalLevel(level) }
 
     private fun act(block: suspend (Session) -> Unit) {
         val open = session.value ?: return

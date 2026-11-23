@@ -39,7 +39,11 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
     /** The microphone that [enableMicrophone] opens. */
     var inputDevice = InputDevice.BuiltIn
 
+    /** Where the output goes; a recording captures it as its route. */
     var outputRoute = OutputRoute.Wired
+
+    override suspend fun currentOutputRoute(): OutputRoute = outputRoute
+
     var reportedLatencyFrames = 4_800L
 
     /** The last value passed to [setInputGain]. */
@@ -80,6 +84,8 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
     override suspend fun load(audio: AudioFile, onProgress: (Float) -> Unit): LoadId {
         listOf(0f, 0.5f, 1f).forEach(onProgress)
         heldTake = null
+        // A Guide Vocal belongs to the Backing Audio it was loaded for.
+        guideVocal = null
         recordingFromMs = null
         state.value = Playback(audio, playing = false, positionMs = 0, durationMs = durationsMs[audio] ?: 0)
         current = LoadId(current.value + 1)
@@ -125,6 +131,18 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
         state.update { it.copy(positionMs = positionMs.coerceIn(0, it.durationMs)) }
     }
 
+    /** The Practice Loop free playback repeats, as start to end in ms. */
+    var practiceLoop: LongRange? = null
+        private set
+
+    override fun setPracticeLoop(startMs: Long, endMs: Long) {
+        practiceLoop = startMs..endMs
+    }
+
+    override fun clearPracticeLoop() {
+        practiceLoop = null
+    }
+
     override fun beginSession() {
         inSession = true
     }
@@ -132,6 +150,7 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
     override fun endSession() {
         inSession = false
         heldTake = null
+        practiceLoop = null
         playbackTranspose = Transpose.None
         inputState.value = InputLevel.Off
         state.update { it.copy(playing = false, recording = false, playingTake = false) }
@@ -214,7 +233,7 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
     var guideVocalLevel = 0f
         private set
 
-    override suspend fun loadGuideVocal(file: AudioFile, fromFrame: Long): Boolean {
+    override suspend fun loadGuideVocal(file: AudioFile, fromMs: Long): Boolean {
         guideVocal = file
         return true
     }
@@ -227,11 +246,16 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
         guideVocal = null
     }
 
-    /** Simulates playback time passing; recording and Take playback stop at their ends. */
+    /** Simulates playback time passing; recording and Take playback stop at their ends, free playback loops. */
     fun advance(ms: Long) {
         val now = state.value
         if (!now.playing) return
-        val position = (now.positionMs + ms).coerceAtMost(now.durationMs)
+        val loop = practiceLoop?.takeIf { !now.recording && !now.playingTake && now.positionMs < it.last }
+        val position = if (loop != null && now.positionMs + ms >= loop.last) {
+            loop.first + (now.positionMs + ms - loop.first) % (loop.last - loop.first)
+        } else {
+            (now.positionMs + ms).coerceAtMost(now.durationMs)
+        }
         state.update { it.copy(positionMs = position) }
         // Take playback runs on for the reverb's tail.
         val takeEndMs = heldTake?.let { (it.startFrame + it.frames) / FRAMES_PER_MS + vocalEffects.reverb.tailMs }

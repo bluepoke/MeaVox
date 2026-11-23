@@ -187,6 +187,15 @@
     <string name="session_transpose_down">Tiefer transponieren</string>
     <string name="session_transpose_up">Höher transponieren</string>
     <string name="session_transpose_next_take">Dieser Take bleibt bei %1$s; die neue Einstellung gilt für den nächsten Take.</string>
+    <string name="session_loop">Übungsschleife</string>
+    <string name="session_loop_mark_a">A hier setzen</string>
+    <string name="session_loop_mark_b">B hier setzen</string>
+    <string name="session_loop_off">Aus</string>
+    <string name="session_loop_hint">Setze A und B, um eine Stelle beim Lernen zu wiederholen. Dabei wird nichts aufgenommen.</string>
+    <string name="session_loop_mark_b_next">A bei %1$s: jetzt weiterspielen und B setzen.</string>
+    <string name="session_loop_range">%1$s – %2$s wiederholt sich beim Abspielen.</string>
+    <string name="session_loop_too_short">B muss mindestens %1$d s nach A liegen.</string>
+    <string name="session_guide_vocal_hint">Mischt den Originalgesang in deine Kopfhörer, in deiner Tonart. Wird nie aufgenommen; beim Aufnehmen ohne Kopfhörer stumm.</string>
     <string name="session_review">Anhören</string>
     <string name="session_review_take">Take ab %1$s, %2$s lang, transponiert %3$s</string>
     <string name="session_play_again">Noch mal abspielen</string>

@@ -213,6 +213,18 @@ class OboeAudioEngine(context: Context) : AudioEngine {
 
     // --- Session face ---
 
+    override fun setPracticeLoop(startMs: Long, endMs: Long) {
+        scope.launch { NativePlayback.setPracticeLoop(handle, startMs, endMs) }
+    }
+
+    override fun clearPracticeLoop() {
+        scope.launch { NativePlayback.clearPracticeLoop(handle) }
+    }
+
+    override suspend fun currentOutputRoute(): OutputRoute = withContext(control) {
+        routes.output(NativePlayback.outputDeviceId(handle))
+    }
+
     override fun beginSession() {
         scope.launch {
             inSession = true
@@ -356,7 +368,7 @@ class OboeAudioEngine(context: Context) : AudioEngine {
         }
     }
 
-    override suspend fun loadGuideVocal(file: AudioFile, fromFrame: Long): Boolean {
+    override suspend fun loadGuideVocal(file: AudioFile, fromMs: Long): Boolean {
         val ready = CompletableDeferred<Boolean>()
         // On [control], so it runs after a clearGuideVocal() called before it.
         withContext(control) {
@@ -369,7 +381,7 @@ class OboeAudioEngine(context: Context) : AudioEngine {
                             ready.complete(false)
                             return@launch
                         }
-                        val wanted = fromFrame + reader.sampleRate.toLong() * START_BUFFER_MS / 1000
+                        val wanted = (fromMs + START_BUFFER_MS) * reader.sampleRate / 1000
                         val block = FloatArray(GUIDE_BLOCK_FRAMES * reader.channels)
                         while (isActive) {
                             val n = reader.read(block, GUIDE_BLOCK_FRAMES)
