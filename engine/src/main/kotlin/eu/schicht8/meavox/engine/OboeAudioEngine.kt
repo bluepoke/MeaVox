@@ -8,12 +8,14 @@ import android.util.Log
 import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.InputDevice
+import eu.schicht8.meavox.core.model.OutputPath
 import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.Transpose
 import eu.schicht8.meavox.core.port.AudioEngine
 import eu.schicht8.meavox.core.port.CapturedTake
 import eu.schicht8.meavox.core.port.InputLevel
 import eu.schicht8.meavox.core.port.LoadId
+import eu.schicht8.meavox.core.port.OutputStatus
 import eu.schicht8.meavox.core.port.Playback
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -57,6 +59,9 @@ class OboeAudioEngine(context: Context) : AudioEngine {
     private val inputState = MutableStateFlow(InputLevel.Off)
     override val input: StateFlow<InputLevel> = inputState
 
+    private val outputState = MutableStateFlow(OutputStatus.Off)
+    override val output: StateFlow<OutputStatus> = outputState
+
     // Native control calls are serialised on one thread; decoding runs on IO.
     private val control = Dispatchers.Default.limitedParallelism(1)
     private val scope = CoroutineScope(SupervisorJob() + control)
@@ -70,6 +75,13 @@ class OboeAudioEngine(context: Context) : AudioEngine {
     private var inSession = false
     /** Route of the recording whose Take audio is held; null when the held audio isn't a fresh capture. */
     private var captureRoute: OutputRoute? = null
+    private var capturePath = OutputPath.Normal
+    private val outputRoutes = mutableMapOf<Int, OutputRoute>()
+    private var reportedLatencyMs: Int? = null
+    private var latencyRefreshIn = 0
+    private var lastOutputDevice = 0
+    private var lastMonitoring = false
+    private var lastInputEnabled = false
     private var lastClipCount = 0L
     private var lastClipAt = Long.MIN_VALUE
     private val inputDevices = mutableMapOf<Int, InputDevice>()
@@ -250,6 +262,16 @@ class OboeAudioEngine(context: Context) : AudioEngine {
         enabled
     }
 
+    override suspend fun setMonitoring(enabled: Boolean): Boolean = withContext(control) {
+        val on = NativePlayback.setMonitoring(handle, enabled)
+        publish()
+        on
+    }
+
+    override fun setMonitoringLevel(level: Float) {
+        scope.launch { NativePlayback.setMonitoringLevel(handle, level) }
+    }
+
     override fun setInputGain(gainDb: Float) {
         val linear = 10f.pow(gainDb / 20f)
         scope.launch { NativePlayback.setInputGain(handle, linear) }
@@ -274,6 +296,7 @@ class OboeAudioEngine(context: Context) : AudioEngine {
         if (rate <= 0) return@withContext false
         val started = NativePlayback.startRecording(handle, fromMs * rate / 1000, transpose.semitones)
         captureRoute = if (started) routes.output(NativePlayback.outputDeviceId(handle)) else null
+        capturePath = pathOf(NativePlayback.monitoring(handle))
         if (started) startTicker()
         publish()
         started
@@ -293,6 +316,7 @@ class OboeAudioEngine(context: Context) : AudioEngine {
             sampleRate = NativePlayback.sampleRate(handle),
             route = route,
             reportedLatencyFrames = NativePlayback.takeReportedLatencyFrames(handle),
+            path = capturePath,
         )
     }
 
@@ -451,7 +475,40 @@ class OboeAudioEngine(context: Context) : AudioEngine {
             playingTake = transport == NativePlayback.PLAYING_TAKE,
         )
         publishInput()
+        publishOutput()
     }
+
+    private fun publishOutput() {
+        if (!inSession) {
+            outputState.value = OutputStatus.Off
+            return
+        }
+        val deviceId = NativePlayback.outputDeviceId(handle)
+        val monitoring = NativePlayback.monitoring(handle)
+        // The platform's estimate settles once the streams run: refresh it now and then, and at once
+        // when the route or the output path changes.
+        val inputEnabled = NativePlayback.inputEnabled(handle)
+        if (deviceId != lastOutputDevice || monitoring != lastMonitoring || inputEnabled != lastInputEnabled) latencyRefreshIn = 0
+        lastOutputDevice = deviceId
+        lastMonitoring = monitoring
+        lastInputEnabled = inputEnabled
+        if (--latencyRefreshIn <= 0) {
+            val rate = NativePlayback.sampleRate(handle)
+            val frames = if (inputEnabled) NativePlayback.reportedLatencyFrames(handle) else 0
+            reportedLatencyMs = if (frames > 0 && rate > 0) (frames * 1000 / rate).toInt() else null
+            // Freshly started streams often can't report yet: ask again soon until they can.
+            latencyRefreshIn = if (reportedLatencyMs == null && inputEnabled) 2 else LATENCY_REFRESH_TICKS
+        }
+        outputState.value = OutputStatus(
+            // AudioManager lookups are binder calls: resolve each device ID once.
+            route = if (deviceId == 0) null else outputRoutes.getOrPut(deviceId) { routes.output(deviceId) },
+            path = pathOf(monitoring),
+            monitoring = monitoring,
+            reportedLatencyMs = if (inputEnabled) reportedLatencyMs else null,
+        )
+    }
+
+    private fun pathOf(monitoring: Boolean) = if (monitoring) OutputPath.LowLatency else OutputPath.Normal
 
     private fun publishInput() {
         if (!inSession || !NativePlayback.inputEnabled(handle)) {
@@ -478,6 +535,9 @@ class OboeAudioEngine(context: Context) : AudioEngine {
         const val POSITION_INTERVAL_MS = 50L
         const val START_BUFFER_MS = 2_000L
         const val CLIP_HOLD_MS = 1_500L
+
+        /** About once a second at [POSITION_INTERVAL_MS]. */
+        const val LATENCY_REFRESH_TICKS = 20
         const val GUIDE_BLOCK_FRAMES = 8192
         const val TAG = "MeaVoxEngine"
     }

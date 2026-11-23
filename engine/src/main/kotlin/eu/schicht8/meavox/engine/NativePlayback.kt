@@ -25,6 +25,9 @@ internal object NativePlayback {
     external fun createHeadless(): Long
     /** Runs the audio callback once for [frames] of interleaved stereo [out]. Headless engines only. */
     external fun renderHeadless(handle: Long, out: FloatArray, frames: Int)
+
+    /** [renderHeadless], with [inFrames] of mono [mic] as what the microphone heard meanwhile. */
+    external fun renderHeadlessWithInput(handle: Long, out: FloatArray, frames: Int, mic: FloatArray, inFrames: Int)
     external fun destroyHeadless(handle: Long)
     external fun beginLoad(handle: Long, channels: Int, sampleRate: Int, estimatedFrames: Long)
     /** Returns false once the reserved capacity is exhausted: stop decoding. */
@@ -49,6 +52,14 @@ internal object NativePlayback {
     // Session
     external fun setSessionMode(handle: Long, enabled: Boolean)
     external fun enableInput(handle: Long): Boolean
+
+    /** Monitoring (#9): reopens the Session output on the low-latency path while on (ADR 16); returns whether it is on. */
+    external fun setMonitoring(handle: Long, enabled: Boolean): Boolean
+    external fun setMonitoringLevel(handle: Long, level: Float)
+    external fun monitoring(handle: Long): Boolean
+
+    /** Output + input latency as the platform reports it now; 0 without both streams. */
+    external fun reportedLatencyFrames(handle: Long): Long
     external fun inputEnabled(handle: Long): Boolean
     external fun setInputGain(handle: Long, linear: Float)
     external fun setReviewBackingGain(handle: Long, linear: Float)

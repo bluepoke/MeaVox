@@ -4,12 +4,14 @@ package eu.schicht8.meavox.core.testing
 import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.InputDevice
+import eu.schicht8.meavox.core.model.OutputPath
 import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.Transpose
 import eu.schicht8.meavox.core.port.AudioEngine
 import eu.schicht8.meavox.core.port.CapturedTake
 import eu.schicht8.meavox.core.port.InputLevel
 import eu.schicht8.meavox.core.port.LoadId
+import eu.schicht8.meavox.core.port.OutputStatus
 import eu.schicht8.meavox.core.port.Playback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,12 +41,83 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
     /** The microphone that [enableMicrophone] opens. */
     var inputDevice = InputDevice.BuiltIn
 
-    /** Where the output goes; a recording captures it as its route. */
+    /** Where the output goes; a recording captures it as its route. See [changeRoute] for a route change. */
     var outputRoute = OutputRoute.Wired
+        set(value) {
+            field = value
+            publishOutput()
+        }
 
     override suspend fun currentOutputRoute(): OutputRoute = outputRoute
 
+    /** The round trip the platform reports: on the normal path, and on the low-latency path while Monitoring is on. */
     var reportedLatencyFrames = 4_800L
+        set(value) {
+            field = value
+            publishOutput()
+        }
+    var lowLatencyReportedLatencyFrames = 1_920L
+        set(value) {
+            field = value
+            publishOutput()
+        }
+
+    private val outputState = MutableStateFlow(OutputStatus.Off)
+    override val output: StateFlow<OutputStatus> = outputState
+
+    /** Whether Monitoring is on, and its level. */
+    var monitoring = false
+        private set
+    var monitoringLevel = 0f
+        private set
+
+    /** Times the Session output was reopened to switch the output path (ADR 16). */
+    var outputReopens = 0
+        private set
+
+    override suspend fun setMonitoring(enabled: Boolean): Boolean {
+        if (!inSession) return false
+        if (enabled != monitoring) {
+            monitoring = enabled
+            outputReopens++
+            // Reopening the output pauses playback.
+            state.update { it.copy(playing = false) }
+            publishOutput()
+        }
+        return monitoring
+    }
+
+    override fun setMonitoringLevel(level: Float) {
+        monitoringLevel = level
+    }
+
+    /**
+     * Headphones plugged in or out: the output reopens on [route], on the normal path. A recording ends with what it
+     * captured, playback stops, and Monitoring is off.
+     */
+    fun changeRoute(route: OutputRoute) {
+        if (state.value.recording) finishRecording()
+        state.update { it.copy(playing = false, playingTake = false) }
+        monitoring = false
+        outputRoute = route
+    }
+
+    private val path get() = if (monitoring) OutputPath.LowLatency else OutputPath.Normal
+
+    private fun currentReportedLatencyFrames() = if (monitoring) lowLatencyReportedLatencyFrames else reportedLatencyFrames
+
+    private fun publishOutput() {
+        outputState.value = if (!inSession) {
+            OutputStatus.Off
+        } else {
+            OutputStatus(
+                route = outputRoute,
+                path = path,
+                monitoring = monitoring,
+                reportedLatencyMs = if (inputState.value.enabled) (currentReportedLatencyFrames() / FRAMES_PER_MS).toInt() else null,
+            )
+        }
+    }
 
     /** The last value passed to [setInputGain]. */
     var inputGainDb: Float? = null
@@ -80,6 +153,8 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
         private set
 
     private var recordingFromMs: Long? = null
+    private var recordingPath = OutputPath.Normal
+    private var recordingLatencyFrames = 0L
 
     override suspend fun load(audio: AudioFile, onProgress: (Float) -> Unit): LoadId {
         listOf(0f, 0.5f, 1f).forEach(onProgress)
@@ -145,6 +220,7 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
 
     override fun beginSession() {
         inSession = true
+        publishOutput()
     }
 
     override fun endSession() {
@@ -153,13 +229,16 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
         practiceLoop = null
         playbackTranspose = Transpose.None
         inputState.value = InputLevel.Off
+        monitoring = false
         state.update { it.copy(playing = false, recording = false, playingTake = false) }
+        publishOutput()
     }
 
     override suspend fun enableMicrophone(): Boolean {
         check(inSession) { "no Session" }
         if (!microphoneAvailable) return false
         inputState.value = InputLevel(enabled = true, device = inputDevice, peak = 0f, clipping = false)
+        publishOutput()
         return true
     }
 
@@ -173,6 +252,8 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
         recordingTranspose = transpose
         val from = fromMs.coerceIn(0, state.value.durationMs)
         recordingFromMs = from
+        recordingPath = path
+        recordingLatencyFrames = currentReportedLatencyFrames()
         state.update { it.copy(playing = true, recording = true, playingTake = false, positionMs = from) }
         return true
     }
@@ -187,7 +268,7 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
         recordingFromMs = null
         val frames = (state.value.positionMs - from) * FRAMES_PER_MS
         heldTake = if (frames > 0) {
-            CapturedTake(from * FRAMES_PER_MS, frames, SAMPLE_RATE, outputRoute, reportedLatencyFrames)
+            CapturedTake(from * FRAMES_PER_MS, frames, SAMPLE_RATE, outputRoute, recordingLatencyFrames, recordingPath)
         } else {
             null
         }

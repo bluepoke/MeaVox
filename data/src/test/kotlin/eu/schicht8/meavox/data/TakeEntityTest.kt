@@ -31,4 +31,12 @@ class TakeEntityTest {
             assertEquals(take, take.toEntity().toTake(), "$semitones")
         }
     }
+
+    @Test
+    fun `a Take is stored and read back with the Latency Correction it was kept with`() {
+        for (ms in listOf(-120, 0, 35)) {
+            val take = take(Transpose.None).copy(latencyCorrectionMs = ms)
+            assertEquals(take, take.toEntity().toTake(), "$ms")
+        }
+    }
 }

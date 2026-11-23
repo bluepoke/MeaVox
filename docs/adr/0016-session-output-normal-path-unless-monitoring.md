@@ -1,6 +1,6 @@
 # 16. The Session plays through the normal output path unless Monitoring is on
 
-- Status: Accepted (amends ADR 4)
+- Status: Accepted (amends ADR 4; amended by ADR 23)
 - Date: 2026-11-17
 
 ## Context
@@ -16,4 +16,4 @@ On the Galaxy Tab S6 Lite (Android 14), the Session now sounds as full as Track 
 ## Consequences
 - The output latency in a Session is higher (not measured yet; the engine logs it when the Session opens). It only shifts the reported latency that Take alignment already corrects. Loopback alignment (hardware checklist, #8 item 6) had to be checked again on the new path (see the note above).
 - Larger output buffers leave more headroom for real-time Transpose, so fewer xruns are expected.
-- #9 has to switch the output path when Monitoring is toggled, and its latency warning (ADR 13) applies to the low-latency path only.
+- #9 has to switch the output path when Monitoring is toggled, and its latency warning (ADR 13) applies to the low-latency path only. Built so in #9 (ADR 23); since the two paths' latencies differ, the Latency Correction is per route and path.

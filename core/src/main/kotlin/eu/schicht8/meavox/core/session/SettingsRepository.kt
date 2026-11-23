@@ -2,6 +2,8 @@
 package eu.schicht8.meavox.core.session
 
 import eu.schicht8.meavox.core.model.InputDevice
+import eu.schicht8.meavox.core.model.OutputPath
+import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.SeparationModelId
 
 /** User settings that outlive a Session. Implemented by the data layer; faked in tests. */
@@ -20,6 +22,19 @@ interface SettingsRepository {
     suspend fun inputGainDb(device: InputDevice): Float
 
     suspend fun setInputGainDb(device: InputDevice, gainDb: Float)
+
+    /**
+     * The Latency Correction of one output route and path in ms (#9), set by ear in Review; null until it was
+     * set, or a Take on them was kept.
+     */
+    suspend fun latencyCorrectionMs(route: OutputRoute, path: OutputPath): Int?
+
+    suspend fun setLatencyCorrectionMs(route: OutputRoute, path: OutputPath, ms: Int)
+
+    /** Level of Monitoring, 0..1 (#9); null until set. Monitoring itself always starts off. */
+    suspend fun monitoringLevel(): Float?
+
+    suspend fun setMonitoringLevel(level: Float)
 
     /** The Default Separation Model the user chose (ADR 19); null until chosen. See [eu.schicht8.meavox.core.pipeline.DefaultSeparationModel]. */
     suspend fun defaultSeparationModel(): SeparationModelId?

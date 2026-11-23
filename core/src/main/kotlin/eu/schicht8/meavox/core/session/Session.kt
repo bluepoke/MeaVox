@@ -15,16 +15,19 @@ import eu.schicht8.meavox.core.mix.fileOf
 import eu.schicht8.meavox.core.mix.guideVocalUnavailable
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.BackingChoice
+import eu.schicht8.meavox.core.model.OutputPath
 import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.Take
 import eu.schicht8.meavox.core.model.TakeId
 import eu.schicht8.meavox.core.model.Track
 import eu.schicht8.meavox.core.model.Transpose
+import eu.schicht8.meavox.core.model.latencyFrames
 import eu.schicht8.meavox.core.port.AudioEngine
 import eu.schicht8.meavox.core.port.CapturedTake
 import eu.schicht8.meavox.core.port.InputLevel
 import eu.schicht8.meavox.core.port.LoadId
+import eu.schicht8.meavox.core.port.OutputStatus
 import eu.schicht8.meavox.core.port.Playback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -302,8 +305,105 @@ class Session private constructor(
     /** Plays the Take in Review against the Backing Audio again, at its Transpose, from its Start Position. */
     suspend fun replay() = mutex.withLock {
         val review = _state.value as? SessionState.Review ?: return@withLock
-        engine.playTake(review.take.reportedLatencyFrames, review.transpose)
+        engine.playTake(review.latencyFrames(), review.transpose)
     }
+
+    // --- Latency Correction (#9, ADR 23) ---
+
+    private val _latencyCorrection = MutableStateFlow<LatencyCorrection?>(null)
+
+    /** The Latency Correction of the Take in Review's route and output path; null outside Review. */
+    val latencyCorrection: StateFlow<LatencyCorrection?> = _latencyCorrection
+
+    /**
+     * Sets the Latency Correction by ear in Review, within ±[MAX_LATENCY_CORRECTION_MS]: the Take in Review
+     * plays with it at once, and it is kept for its route and output path, so later Takes there are recorded
+     * with it. Takes kept before keep their own.
+     */
+    suspend fun setLatencyCorrection(ms: Int) = mutex.withLock {
+        val review = _state.value as? SessionState.Review ?: return@withLock
+        val correction = _latencyCorrection.value ?: return@withLock
+        val clamped = ms.coerceIn(-MAX_LATENCY_CORRECTION_MS, MAX_LATENCY_CORRECTION_MS)
+        _latencyCorrection.value = correction.copy(ms = clamped, checked = true)
+        storeCorrectionLocked(correction.route, correction.path, clamped)
+        engine.setTakeAlignment(review.latencyFrames())
+    }
+
+    private suspend fun storeCorrectionLocked(route: OutputRoute, path: OutputPath, ms: Int) {
+        deps.settings.setLatencyCorrectionMs(route, path, ms)
+        corrections[route to path] = ms
+        publishOutput()
+    }
+
+    private fun SessionState.Review.latencyFrames(): Long =
+        latencyFrames(take.reportedLatencyFrames, _latencyCorrection.value?.ms ?: 0, take.sampleRate)
+
+    // --- Output and Monitoring (#9, ADR 13, ADR 16) ---
+
+    /** Stored Latency Corrections by route and output path, as far as the Session has needed them. */
+    private val corrections = mutableMapOf<Pair<OutputRoute, OutputPath>, Int?>()
+
+    private var monitoringLevel = DEFAULT_MONITORING_LEVEL
+
+    private val _output = MutableStateFlow(outputOf(OutputStatus.Off))
+
+    /** Where the Session's output goes, its round trip, and Monitoring. */
+    val output: StateFlow<SessionOutput> = _output
+
+    /**
+     * Switches Monitoring on or off, in free playback only. It needs the microphone, and wired or USB headphones
+     * ([SessionOutput.monitoringUnavailable]); switching reopens the output on another path (ADR 16), which
+     * pauses playback. It always starts off, and a route change switches it off. Returns whether it is on.
+     */
+    suspend fun setMonitoring(enabled: Boolean): Boolean = mutex.withLock {
+        val now = engine.output.value
+        if (_state.value != SessionState.Idle || enabled == now.monitoring) return@withLock now.monitoring
+        if (enabled && (now.route.monitoringUnavailable() != null || !enableMicrophone())) return@withLock false
+        engine.setMonitoring(enabled).also { publishOutput() }
+    }
+
+    /** Sets the level of Monitoring, 0..1, kept for later Sessions. */
+    suspend fun setMonitoringLevel(level: Float) {
+        val clamped = level.coerceIn(0f, 1f)
+        mutex.withLock {
+            monitoringLevel = clamped
+            applyMonitoringLocked()
+            publishOutput()
+        }
+        deps.settings.setMonitoringLevel(clamped)
+    }
+
+    /**
+     * Monitoring is heard in free playback (also paused, to set its level), in the countdown and while recording.
+     * While a Take plays back, in Review (also paused), a kept Take or a Mix Preview, the singer listens to it.
+     */
+    private fun applyMonitoringLocked() {
+        val heard = when (_state.value) {
+            SessionState.Idle, is SessionState.CountingDown, is SessionState.Recording -> true
+            is SessionState.Review, is SessionState.PlayingTake, is SessionState.PreviewingMix -> false
+        }
+        engine.setMonitoringLevel(if (heard) monitoringLevel else 0f)
+    }
+
+    private fun publishOutput(status: OutputStatus = engine.output.value) {
+        _output.value = outputOf(status)
+    }
+
+    private fun outputOf(status: OutputStatus): SessionOutput {
+        val correction = status.route?.let { corrections[it to status.path] }
+        return SessionOutput(
+            route = status.route,
+            path = status.path,
+            roundTripMs = status.reportedLatencyMs?.let { it + (correction ?: 0) },
+            corrected = correction != null,
+            monitoring = status.monitoring,
+            monitoringLevel = monitoringLevel,
+            monitoringUnavailable = status.route.monitoringUnavailable(),
+        )
+    }
+
+    private suspend fun correctionOf(route: OutputRoute, path: OutputPath): Int? =
+        corrections.getOrPut(route to path) { deps.settings.latencyCorrectionMs(route, path) }
 
     /**
      * Keeps the Take in Review: its audio is written as mono FLAC, then it is stored and listed,
@@ -326,7 +426,10 @@ class Session private constructor(
             reportedLatencyFrames = captured.reportedLatencyFrames,
             transpose = review.transpose,
             recordedAt = deps.clock(),
+            latencyCorrectionMs = _latencyCorrection.value?.ms ?: 0,
         )
+        // Kept as it sounded: that confirms the Latency Correction for the route and path.
+        _latencyCorrection.value?.takeIf { !it.checked }?.let { storeCorrectionLocked(it.route, it.path, it.ms) }
         deps.takes.add(take)
         // The Backing Audio doesn't switch during Review, so this is what the Take was sung over.
         deps.mixes.add(take, _backing.value)
@@ -363,10 +466,11 @@ class Session private constructor(
         val stored = deps.takes.get(take) ?: return@withLock false
         engine.pause()
         if (!engine.loadTake(deps.files.take(track.id, stored.id), stored.startFrame)) return@withLock false
-        // Until Latency Calibration (#9), alignment uses the engine's estimate from recording.
         _state.value = SessionState.PlayingTake(stored)
         applyGuideVocalLocked()
-        if (!engine.playTake(stored.reportedLatencyFrames, stored.transpose)) {
+        applyMonitoringLocked()
+        // With the Latency Correction it was kept with (#9).
+        if (!engine.playTake(stored.latencyFrames, stored.transpose)) {
             becomeIdleLocked()
             return@withLock false
         }
@@ -420,6 +524,7 @@ class Session private constructor(
             return@withLock false
         }
         _state.value = SessionState.PreviewingMix(parts.mix, parts.take, parts.mix.settings)
+        applyMonitoringLocked()
         previewParts = parts
         applyMixSettings(parts, parts.mix.settings)
         if (!engine.playTake(parts.alignmentFrames(), parts.take.transpose)) {
@@ -550,9 +655,13 @@ class Session private constructor(
             becomeIdleLocked()
             return
         }
-        _state.value = SessionState.Review(take, recording.transpose)
+        val stored = correctionOf(take.route, take.path)
+        _latencyCorrection.value = LatencyCorrection(take.route, take.path, ms = stored ?: 0, checked = stored != null)
+        val review = SessionState.Review(take, recording.transpose)
+        _state.value = review
         applyGuideVocalLocked()
-        engine.playTake(take.reportedLatencyFrames, recording.transpose)
+        applyMonitoringLocked()
+        engine.playTake(review.latencyFrames(), recording.transpose)
     }
 
     private suspend fun leaveReviewLocked(take: CapturedTake) {
@@ -567,6 +676,8 @@ class Session private constructor(
      */
     private suspend fun becomeIdleLocked(positionMs: Long? = null) {
         _state.value = SessionState.Idle
+        _latencyCorrection.value = null
+        applyMonitoringLocked()
         val position = positionMs ?: engine.playback.value.positionMs
         switchBackingLocked(wantedBacking, position, resume = false)
         applyGuideVocalLocked(position)
@@ -628,6 +739,8 @@ class Session private constructor(
         _countdownEnabled.value = deps.settings.countdownEnabled()
         _reviewBackingDb.value = deps.settings.reviewBackingDb() ?: DEFAULT_REVIEW_BACKING_DB
         engine.setReviewBackingGain(_reviewBackingDb.value)
+        monitoringLevel = deps.settings.monitoringLevel() ?: DEFAULT_MONITORING_LEVEL
+        applyMonitoringLocked()
         // A Session left during a Mix Preview may have left its vocal level and effects behind.
         engine.setTakeGain(0f)
         resetMixEffects()
@@ -691,6 +804,13 @@ class Session private constructor(
             }
         }
         observers.launch {
+            // The route or path changed (headphones, Monitoring): show its round trip with its correction.
+            engine.output.collect { status ->
+                status.route?.let { correctionOf(it, status.path) }
+                publishOutput(status)
+            }
+        }
+        observers.launch {
             // Each kind of microphone keeps its own input gain (ADR 9).
             engine.input.map { it.device }.filterNotNull().distinctUntilChanged().collect { device ->
                 val gain = deps.settings.inputGainDb(device)
@@ -710,8 +830,10 @@ class Session private constructor(
         const val DEFAULT_REVIEW_BACKING_DB = -20f
         const val MIN_REVIEW_BACKING_DB = -40f
 
-        /** Outputs the microphone can't pick up: the Guide Vocal plays on while recording over them. */
-        private val HEADPHONES = setOf(OutputRoute.Wired, OutputRoute.Usb, OutputRoute.Bluetooth)
+        /** The largest Latency Correction either way (#9): more than Bluetooth's round trip. */
+        const val MAX_LATENCY_CORRECTION_MS = 400
+
+        const val DEFAULT_MONITORING_LEVEL = 0.5f
 
         /** The shortest Practice Loop. */
         const val MIN_LOOP_MS = 1_000L

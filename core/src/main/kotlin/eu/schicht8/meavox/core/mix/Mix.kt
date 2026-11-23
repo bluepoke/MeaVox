@@ -33,7 +33,7 @@ data class MixSettings(
     val backingDb: Float,
     /** Level of the Take in dB, [MIN_VOCAL_DB]..[MAX_VOCAL_DB]. */
     val vocalDb: Float = 0f,
-    /** Vocal Nudge: the Take sounds this much later (negative: earlier), on top of Latency Calibration. */
+    /** Vocal Nudge: the Take sounds this much later (negative: earlier), on top of the Latency Correction. */
     val vocalNudgeMs: Int = 0,
     /** The Vocal Effects on the Take (#16); none by default. */
     val effects: VocalEffects = VocalEffects.None,
@@ -77,10 +77,10 @@ data class MixSettings(
 
 /**
  * Frames the Take is moved earlier against the timeline when it plays in a Mix: its sample i sounds at
- * Start Position + i − alignment (spec #1). That is the Latency Calibration offset minus the Vocal
- * Nudge; until Latency Calibration (#9), the offset is the engine's estimate from recording.
+ * Start Position + i − alignment (spec #1). That is the Take's latency (the engine's estimate from
+ * recording plus the Latency Correction it was kept with, #9) minus the Vocal Nudge.
  */
-fun Take.alignmentFrames(settings: MixSettings): Long = reportedLatencyFrames - settings.vocalNudgeMs.toLong() * sampleRate / 1000
+fun Take.alignmentFrames(settings: MixSettings): Long = latencyFrames - settings.vocalNudgeMs.toLong() * sampleRate / 1000
 
 /** Persistence of Mixes. Implemented by the data layer (Room); faked in tests. */
 interface MixRepository {

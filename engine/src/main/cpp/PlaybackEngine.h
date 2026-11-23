@@ -21,8 +21,12 @@
 // Practice Loop (#18): free playback that reaches B goes on at A, through the same BackingRenderer, so
 // a transposed loop is as seamless as a plain one.
 //
+// Monitoring (#9, ADR 13): the dry microphone is added to the output at a level, untransposed, in free
+// playback and while recording, never into the Take and not while a Take plays. While it is on, the Session
+// output runs on the low-latency path; otherwise on the normal one (ADR 16). A route change switches it off.
+//
 // Headless (engine tests): no device streams; the caller runs the audio callback with renderHeadless()
-// on its own thread, so the PCM played can be asserted.
+// on its own thread, feeding the microphone's frames itself, so the PCM played can be asserted.
 //
 // Threading: public methods may be called from any non-audio thread; mutating ones are
 // serialised by mControlMutex. The Backing Audio's blocks are freed only while the stream is
@@ -58,8 +62,9 @@ public:
     explicit PlaybackEngine(bool headless = false) : mHeadless(headless) {}
     ~PlaybackEngine() override;
 
-    // Headless only: runs the audio callback once for [frames] of interleaved stereo [out].
-    void renderHeadless(float *out, int32_t frames);
+    // Headless only: runs the audio callback once for [frames] of interleaved stereo [out], with [inFrames]
+    // of mono [in] as what the microphone heard meanwhile (once the input is enabled).
+    void renderHeadless(float *out, int32_t frames, const float *in = nullptr, int32_t inFrames = 0);
 
     // Starts a new load (stopping playback and releasing the previous song and Take first):
     // decoded PCM at the file's own rate, 1..n channels interleaved. [estimatedFrames] (0 if
@@ -91,6 +96,14 @@ public:
     // Opens the microphone (Session mode only; needs the RECORD_AUDIO permission).
     bool enableInput();
     void setInputGain(float linear);
+    // Monitoring (#9): reopens the Session's streams on the low-latency output path while it is on, the normal
+    // path otherwise (ADR 16), which pauses playback. Returns whether it is on.
+    bool setMonitoring(bool enabled);
+    // Level of Monitoring, 0..1.
+    void setMonitoringLevel(float level);
+    bool monitoring() const { return mMonitoring.load(); }
+    // Output + input latency as the platform reports it now; 0 without both streams (ADR 13).
+    int64_t reportedLatencyFrames();
     // Backing Audio gain while the held Take plays (Review Balance); recording is unaffected.
     void setReviewBackingGain(float linear);
     // Gain of the held Take while it plays (a Mix Preview's vocal level); 1 until set.
@@ -224,7 +237,10 @@ private:
     void configureStretchLocked(int32_t sampleRate);
     int64_t reportedLatencyFramesLocked();
 
+    bool hasInputLocked() const { return mHeadless ? mInputOpen.load() : mInput != nullptr; }
     int readInput(int numFrames);
+    int readDeviceInput(int numFrames, int32_t capacity);
+    void monitorInput(float *out, int numFrames, int numIn);
     void trackXRuns();
 
     const bool mHeadless = false;
@@ -273,6 +289,12 @@ private:
     std::vector<float> mDropBuffer;
     int mDrainLeft = 0;
     bool mCushion = false;  // skip one read after draining, so reads don't race the input's writes
+    // Monitoring (#9): read by the callback; switched with the streams closed (setMonitoring).
+    std::atomic<bool> mMonitoring{false};
+    std::atomic<float> mMonitorLevel{0.0f};
+    // Headless: the microphone frames for the callback running now (renderHeadless).
+    const float *mHeadlessIn = nullptr;
+    int32_t mHeadlessInFrames = 0;
 
     // Take: mono, index i = timeline frame mTakeStart + i while recording.
     std::vector<float> mTake;

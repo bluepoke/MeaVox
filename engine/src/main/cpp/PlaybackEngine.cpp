@@ -313,17 +313,27 @@ bool PlaybackEngine::startStreamLocked() {
 //
 // The output takes the normal path, like plain playback: devices apply their speaker processing
 // (e.g. Dolby Atmos) only there, and the low-latency path sounds thin without it. Latency only
-// matters for Monitoring; Takes are aligned by timestamps and Latency Calibration (ADR 16).
+// matters for Monitoring, so only Monitoring takes the low-latency path; Takes are aligned by
+// timestamps and the Latency Correction (ADR 16, #9).
 bool PlaybackEngine::openSessionStreamsLocked() {
     closeStreamLocked();
-    if (mHeadless) return true;
+    if (mHeadless) {
+        // The test feeds the microphone (renderHeadless).
+        if (mInputWanted) {
+            mInputBuffer.assign(4096, 0.0f);
+            mDropBuffer.assign(4096, 0.0f);
+        }
+        mInputOpen.store(mInputWanted);
+        return true;
+    }
     const int32_t rate = mSampleRate.load();
     if (rate <= 0) return false;  // nothing loaded yet; opened by the next load
 
+    const bool lowLatency = mMonitoring.load();
     oboe::AudioStreamBuilder out;
     out.setDirection(oboe::Direction::Output)
-            ->setPerformanceMode(oboe::PerformanceMode::None)
-            ->setSharingMode(oboe::SharingMode::Shared)
+            ->setPerformanceMode(lowLatency ? oboe::PerformanceMode::LowLatency : oboe::PerformanceMode::None)
+            ->setSharingMode(lowLatency ? oboe::SharingMode::Exclusive : oboe::SharingMode::Shared)
             ->setFormat(oboe::AudioFormat::Float)
             ->setChannelCount(oboe::ChannelCount::Stereo)
             ->setSampleRate(rate)
@@ -376,9 +386,9 @@ bool PlaybackEngine::openSessionStreamsLocked() {
         closeStreamLocked();
         return false;
     }
-    LOGI("Session streams: rate=%d burst=%d buffer=%d excl=%d input=%d", rate, mStream->getFramesPerBurst(),
+    LOGI("Session streams: rate=%d burst=%d buffer=%d excl=%d input=%d monitoring=%d", rate, mStream->getFramesPerBurst(),
          mStream->getBufferSizeInFrames(), mStream->getSharingMode() == oboe::SharingMode::Exclusive,
-         mInput != nullptr);
+         mInput != nullptr, lowLatency);
     return true;
 }
 
@@ -408,7 +418,9 @@ void PlaybackEngine::onErrorAfterClose(oboe::AudioStream *stream, oboe::Result e
     mTransport.store(Transport::Idle);
     closeStreamLocked();
     if (mSession) {
-        // Headphones plugged in or out: reopen on the new route so the Session keeps working.
+        // Headphones plugged in or out: reopen on the new route so the Session keeps working. Monitoring goes
+        // off: the new route may be the speaker, and the user switches it on again where it's allowed (ADR 13).
+        mMonitoring.store(false);
         openSessionStreamsLocked();
     }
 }
@@ -433,6 +445,7 @@ void PlaybackEngine::setSessionMode(bool enabled) {
     enterIdleLocked();
     closeStreamLocked();
     mSession = enabled;
+    mMonitoring.store(false);  // never on by itself (ADR 13)
     if (enabled) {
         openSessionStreamsLocked();
     } else {
@@ -448,13 +461,36 @@ void PlaybackEngine::setSessionMode(bool enabled) {
 bool PlaybackEngine::enableInput() {
     std::lock_guard<std::mutex> lock(mControlMutex);
     if (!mSession) return false;
-    if (mInput) return true;
+    if (hasInputLocked()) return true;
     enterIdleLocked();
     mInputWanted = true;
     // The microphone is read on the output callback: reopen both together.
     openSessionStreamsLocked();
-    if (!mInput) mInputWanted = false;  // e.g. no permission; try again on the next call
-    return mInput != nullptr;
+    if (!hasInputLocked()) mInputWanted = false;  // e.g. no permission; try again on the next call
+    return hasInputLocked();
+}
+
+bool PlaybackEngine::setMonitoring(bool enabled) {
+    std::lock_guard<std::mutex> lock(mControlMutex);
+    if (!mSession) return false;
+    if (enabled == mMonitoring.load()) return enabled;
+    enterIdleLocked();
+    mMonitoring.store(enabled);
+    // Reopen on the other output path (ADR 16). Monitoring needs the microphone: if either stream won't open on
+    // the low-latency path, go back to the normal one with Monitoring off.
+    const bool opened = openSessionStreamsLocked();
+    if (enabled && (!opened || !hasInputLocked())) {
+        mMonitoring.store(false);
+        openSessionStreamsLocked();
+    }
+    return mMonitoring.load();
+}
+
+void PlaybackEngine::setMonitoringLevel(float level) { mMonitorLevel.store(std::clamp(level, 0.0f, 1.0f)); }
+
+int64_t PlaybackEngine::reportedLatencyFrames() {
+    std::lock_guard<std::mutex> lock(mControlMutex);
+    return reportedLatencyFramesLocked();
 }
 
 void PlaybackEngine::setInputGain(float linear) { mInputGain.store(std::clamp(linear, 0.0f, 16.0f)); }
@@ -476,7 +512,7 @@ int64_t PlaybackEngine::reportedLatencyFramesLocked() {
 
 bool PlaybackEngine::startRecording(int64_t fromFrame, int transpose) {
     std::lock_guard<std::mutex> lock(mControlMutex);
-    if (!mSession || !mInput || !mStream || mDecoded.load() <= 0) return false;
+    if (!mSession || !hasInputLocked() || (!mHeadless && !mStream) || mDecoded.load() <= 0) return false;
     enterIdleLocked();
     const int64_t from = std::clamp<int64_t>(fromFrame, 0, std::max<int64_t>(durationFrames(), 0));
     const int64_t remaining = std::max<int64_t>(durationFrames() - from, 0);
@@ -484,7 +520,7 @@ bool PlaybackEngine::startRecording(int64_t fromFrame, int transpose) {
     mTakeFrames.store(0);
     mTakeStart = from;
     mTakeLatency = reportedLatencyFramesLocked();
-    auto xruns = mStream->getXRunCount();
+    auto xruns = mStream ? mStream->getXRunCount() : oboe::ResultWithValue<int32_t>(oboe::Result::ErrorNull);
     mLastOutXRuns = xruns ? xruns.value() : -1;
     mBacklogFloor = INT32_MAX;
     mXRunMeasureLeft = 0;
@@ -634,8 +670,33 @@ void PlaybackEngine::clearGuide() {
 // ---------------------------------------------------------------------------------------------
 
 int PlaybackEngine::readInput(int numFrames) {
-    if (!mInput) return 0;
     const auto capacity = static_cast<int32_t>(mInputBuffer.size());
+    int n = 0;
+    if (mHeadless) {
+        if (!mInputOpen.load(std::memory_order_relaxed) || !mHeadlessIn) return 0;
+        n = std::min({numFrames, mHeadlessInFrames, capacity});
+        std::copy_n(mHeadlessIn, n, mInputBuffer.data());
+    } else {
+        n = readDeviceInput(numFrames, capacity);
+    }
+    if (n <= 0) return 0;
+    const float gain = mInputGain.load(std::memory_order_relaxed);
+    float peak = 0.0f;
+    bool clipped = false;
+    for (int i = 0; i < n; ++i) {
+        float &sample = mInputBuffer[static_cast<size_t>(i)];
+        // Clipping at the converter can't be undone by a lower gain, so check before and after.
+        clipped = clipped || std::fabs(sample) >= kClipLevel;
+        sample *= gain;
+        peak = std::max(peak, std::fabs(sample));
+    }
+    if (clipped || peak >= kClipLevel) mClipCount.fetch_add(1, std::memory_order_relaxed);
+    mInputPeak.store(std::max(peak, mInputPeak.load(std::memory_order_relaxed) * 0.9f), std::memory_order_relaxed);
+    return n;
+}
+
+int PlaybackEngine::readDeviceInput(int numFrames, int32_t capacity) {
+    if (!mInput) return 0;
     if (mDrainLeft > 0) {
         // Right after (re)starting, the input holds stale frames: empty it so it starts in step.
         for (int i = 0; i < 64; ++i) {
@@ -651,21 +712,21 @@ int PlaybackEngine::readInput(int numFrames) {
         return 0;
     }
     auto r = mInput->read(mInputBuffer.data(), std::min(numFrames, capacity), 0);
-    if (!r || r.value() <= 0) return 0;
-    const int n = r.value();
-    const float gain = mInputGain.load(std::memory_order_relaxed);
-    float peak = 0.0f;
-    bool clipped = false;
+    return r ? r.value() : 0;
+}
+
+// Monitoring (#9): the dry microphone on both channels, untransposed. Only the output gets it: the Take is
+// the microphone alone.
+void PlaybackEngine::monitorInput(float *out, int numFrames, int numIn) {
+    if (numIn <= 0 || !mMonitoring.load(std::memory_order_relaxed)) return;
+    const float level = mMonitorLevel.load(std::memory_order_relaxed);
+    // The newest frames, when late input was caught up on as well.
+    const int n = std::min(numIn, numFrames);
+    const float *in = mInputBuffer.data() + (numIn - n);
     for (int i = 0; i < n; ++i) {
-        float &sample = mInputBuffer[static_cast<size_t>(i)];
-        // Clipping at the converter can't be undone by a lower gain, so check before and after.
-        clipped = clipped || std::fabs(sample) >= kClipLevel;
-        sample *= gain;
-        peak = std::max(peak, std::fabs(sample));
+        out[i * 2] += in[i] * level;
+        out[i * 2 + 1] += in[i] * level;
     }
-    if (clipped || peak >= kClipLevel) mClipCount.fetch_add(1, std::memory_order_relaxed);
-    mInputPeak.store(std::max(peak, mInputPeak.load(std::memory_order_relaxed) * 0.9f), std::memory_order_relaxed);
-    return n;
 }
 
 // ADR 13: an output xrun (underrun) shifts everything played later by the frames lost, while
@@ -701,8 +762,13 @@ void PlaybackEngine::trackXRuns() {
     mBacklogFloor = std::min(mBacklogFloor, backlog);
 }
 
-void PlaybackEngine::renderHeadless(float *out, int32_t frames) {
-    if (mHeadless) onAudioReady(nullptr, out, frames);
+void PlaybackEngine::renderHeadless(float *out, int32_t frames, const float *in, int32_t inFrames) {
+    if (!mHeadless) return;
+    mHeadlessIn = in;
+    mHeadlessInFrames = inFrames;
+    onAudioReady(nullptr, out, frames);
+    mHeadlessIn = nullptr;
+    mHeadlessInFrames = 0;
 }
 
 oboe::DataCallbackResult PlaybackEngine::onAudioReady(oboe::AudioStream *, void *audioData, int32_t numFrames) {
@@ -720,6 +786,9 @@ oboe::DataCallbackResult PlaybackEngine::onAudioReady(oboe::AudioStream *, void 
     std::fill(out, out + static_cast<size_t>(numFrames) * 2, 0.0f);
 
     if (transport == Transport::Idle) {
+        // Heard while paused too, to set its level.
+        monitorInput(out, numFrames, numIn);
+        clipOutput(out, numFrames);
         mIdleAck.store(true, std::memory_order_release);
         return oboe::DataCallbackResult::Continue;
     }
@@ -793,6 +862,8 @@ oboe::DataCallbackResult PlaybackEngine::onAudioReady(oboe::AudioStream *, void 
         if (pos - mTakeStart + align >= takeFrames + mTakeTail.load(std::memory_order_relaxed)) finished = true;
     }
 
+    // While a Take plays, the singer listens to it, not to themselves.
+    if (transport != Transport::PlayingTake) monitorInput(out, numFrames, numIn);
     clipOutput(out, numFrames);
     // A seek that arrived while this callback ran wins over our position.
     if (mSeekRequest.load(std::memory_order_relaxed) < 0) mPosition.store(pos, std::memory_order_relaxed);

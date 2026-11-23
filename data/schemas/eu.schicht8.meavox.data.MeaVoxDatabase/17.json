@@ -1,0 +1,555 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 17,
+    "identityHash": "5a147631f870645e337cb2e7f8bd2510",
+    "entities": [
+      {
+        "tableName": "tracks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`source` TEXT NOT NULL, `source_track_id` TEXT NOT NULL, `title` TEXT NOT NULL, `artist` TEXT, `duration_ms` INTEGER, `pipeline_state` TEXT NOT NULL, `added_at` INTEGER NOT NULL, `pipeline_progress` TEXT, `pipeline_failure` TEXT, `pipeline_failure_kind` TEXT, `pipeline_failure_service` TEXT, `last_session_at` INTEGER, `vocal_free` INTEGER NOT NULL DEFAULT 0, `backing_choice` TEXT NOT NULL DEFAULT 'instrumental', `separation_model` TEXT, `last_transpose` INTEGER NOT NULL DEFAULT 0, `pipeline_previous_model` TEXT, PRIMARY KEY(`source`, `source_track_id`))",
+        "fields": [
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceTrackId",
+            "columnName": "source_track_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "artist",
+            "columnName": "artist",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "duration_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "pipelineState",
+            "columnName": "pipeline_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pipelineProgress",
+            "columnName": "pipeline_progress",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pipelineFailure",
+            "columnName": "pipeline_failure",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pipelineFailureKind",
+            "columnName": "pipeline_failure_kind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pipelineFailureService",
+            "columnName": "pipeline_failure_service",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastSessionAt",
+            "columnName": "last_session_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "vocalFree",
+            "columnName": "vocal_free",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "backingChoice",
+            "columnName": "backing_choice",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'instrumental'"
+          },
+          {
+            "fieldPath": "separationModel",
+            "columnName": "separation_model",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastTranspose",
+            "columnName": "last_transpose",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "pipelinePreviousModel",
+            "columnName": "pipeline_previous_model",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "source",
+            "source_track_id"
+          ]
+        }
+      },
+      {
+        "tableName": "takes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `source_track_id` TEXT NOT NULL, `name` TEXT NOT NULL, `start_frame` INTEGER NOT NULL, `frames` INTEGER NOT NULL, `sample_rate` INTEGER NOT NULL, `output_route` TEXT NOT NULL, `reported_latency_frames` INTEGER NOT NULL, `transpose` INTEGER NOT NULL DEFAULT 0, `recorded_at` INTEGER NOT NULL, `latency_correction_ms` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`), FOREIGN KEY(`source`, `source_track_id`) REFERENCES `tracks`(`source`, `source_track_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceTrackId",
+            "columnName": "source_track_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startFrame",
+            "columnName": "start_frame",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "frames",
+            "columnName": "frames",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sampleRate",
+            "columnName": "sample_rate",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outputRoute",
+            "columnName": "output_route",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reportedLatencyFrames",
+            "columnName": "reported_latency_frames",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transpose",
+            "columnName": "transpose",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "recordedAt",
+            "columnName": "recorded_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latencyCorrectionMs",
+            "columnName": "latency_correction_ms",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_takes_source_source_track_id",
+            "unique": false,
+            "columnNames": [
+              "source",
+              "source_track_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_takes_source_source_track_id` ON `${TABLE_NAME}` (`source`, `source_track_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "tracks",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "source",
+              "source_track_id"
+            ],
+            "referencedColumns": [
+              "source",
+              "source_track_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "settings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `value` TEXT NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        }
+      },
+      {
+        "tableName": "lyrics",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`source` TEXT NOT NULL, `source_track_id` TEXT NOT NULL, `status` TEXT NOT NULL, `query_artist` TEXT, `query_title` TEXT, `query_duration_ms` INTEGER, `provider_item_id` TEXT, `artist` TEXT, `title` TEXT, `duration_ms` INTEGER, `plain` TEXT, `synced` TEXT, `failure` TEXT, `failure_kind` TEXT, `failure_service` TEXT, PRIMARY KEY(`source`, `source_track_id`), FOREIGN KEY(`source`, `source_track_id`) REFERENCES `tracks`(`source`, `source_track_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceTrackId",
+            "columnName": "source_track_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "queryArtist",
+            "columnName": "query_artist",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "queryTitle",
+            "columnName": "query_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "queryDurationMs",
+            "columnName": "query_duration_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "providerItemId",
+            "columnName": "provider_item_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "artist",
+            "columnName": "artist",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "duration_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "plain",
+            "columnName": "plain",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "synced",
+            "columnName": "synced",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "failure",
+            "columnName": "failure",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "failureKind",
+            "columnName": "failure_kind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "failureService",
+            "columnName": "failure_service",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "source",
+            "source_track_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "tracks",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "source",
+              "source_track_id"
+            ],
+            "referencedColumns": [
+              "source",
+              "source_track_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "lyrics_offsets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`source` TEXT NOT NULL, `source_track_id` TEXT NOT NULL, `offset_ms` INTEGER NOT NULL, PRIMARY KEY(`source`, `source_track_id`), FOREIGN KEY(`source`, `source_track_id`) REFERENCES `tracks`(`source`, `source_track_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceTrackId",
+            "columnName": "source_track_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "offsetMs",
+            "columnName": "offset_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "source",
+            "source_track_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "tracks",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "source",
+              "source_track_id"
+            ],
+            "referencedColumns": [
+              "source",
+              "source_track_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "mixes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `source_track_id` TEXT NOT NULL, `take_id` TEXT NOT NULL, `name` TEXT NOT NULL, `instrumental_model` TEXT, `backing_db` REAL NOT NULL, `vocal_db` REAL NOT NULL, `vocal_nudge_ms` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `reverb` TEXT, `compression` INTEGER NOT NULL DEFAULT 0, `high_pass` INTEGER NOT NULL DEFAULT 0, `guide_vocal_level` REAL NOT NULL DEFAULT 0, PRIMARY KEY(`id`), FOREIGN KEY(`source`, `source_track_id`) REFERENCES `tracks`(`source`, `source_track_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`take_id`) REFERENCES `takes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceTrackId",
+            "columnName": "source_track_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "takeId",
+            "columnName": "take_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "instrumentalModel",
+            "columnName": "instrumental_model",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "backingDb",
+            "columnName": "backing_db",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vocalDb",
+            "columnName": "vocal_db",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vocalNudgeMs",
+            "columnName": "vocal_nudge_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reverb",
+            "columnName": "reverb",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "compression",
+            "columnName": "compression",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "highPass",
+            "columnName": "high_pass",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "guideVocalLevel",
+            "columnName": "guide_vocal_level",
+            "affinity": "REAL",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_mixes_source_source_track_id",
+            "unique": false,
+            "columnNames": [
+              "source",
+              "source_track_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_mixes_source_source_track_id` ON `${TABLE_NAME}` (`source`, `source_track_id`)"
+          },
+          {
+            "name": "index_mixes_take_id",
+            "unique": false,
+            "columnNames": [
+              "take_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_mixes_take_id` ON `${TABLE_NAME}` (`take_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "tracks",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "source",
+              "source_track_id"
+            ],
+            "referencedColumns": [
+              "source",
+              "source_track_id"
+            ]
+          },
+          {
+            "table": "takes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "take_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5a147631f870645e337cb2e7f8bd2510')"
+    ]
+  }
+}

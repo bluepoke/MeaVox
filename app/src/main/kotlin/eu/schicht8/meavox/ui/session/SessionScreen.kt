@@ -100,6 +100,7 @@ import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.Mixes
 import eu.schicht8.meavox.core.model.BackingChoice
 import eu.schicht8.meavox.core.model.InputDevice
+import eu.schicht8.meavox.core.model.OutputPath
 import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -116,8 +117,11 @@ import eu.schicht8.meavox.core.port.InputLevel
 import eu.schicht8.meavox.core.port.LyricsCandidate
 import eu.schicht8.meavox.core.port.Playback
 import eu.schicht8.meavox.core.session.BackingAudio
+import eu.schicht8.meavox.core.session.LatencyCorrection
+import eu.schicht8.meavox.core.session.MonitoringUnavailable
 import eu.schicht8.meavox.core.session.PracticeLoop
 import eu.schicht8.meavox.core.session.Session
+import eu.schicht8.meavox.core.session.SessionOutput
 import eu.schicht8.meavox.core.session.SessionState
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.separating.ModelChoices
@@ -175,6 +179,15 @@ fun SessionRoute(
             viewModel.onMicrophoneDenied()
         }
     }
+    // Monitoring needs the microphone too (#9).
+    val monitoringPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            viewModel.onMicrophoneAllowed()
+            viewModel.setMonitoring(true)
+        } else {
+            viewModel.onMicrophoneDenied()
+        }
+    }
     val track by viewModel.track.collectAsStateWithLifecycle()
     val loadProgress by viewModel.loadProgress.collectAsStateWithLifecycle()
     val openError by viewModel.openError.collectAsStateWithLifecycle()
@@ -221,6 +234,8 @@ fun SessionRoute(
     val transpose by viewModel.transpose.collectAsStateWithLifecycle()
     val practiceLoop by viewModel.practiceLoop.collectAsStateWithLifecycle()
     val guideVocalLevel by viewModel.guideVocalLevel.collectAsStateWithLifecycle()
+    val output by viewModel.output.collectAsStateWithLifecycle()
+    val latencyCorrection by viewModel.latencyCorrection.collectAsStateWithLifecycle()
     val guideVocalUnavailable by viewModel.guideVocalUnavailable.collectAsStateWithLifecycle()
     val mixes by viewModel.trackMixes.collectAsStateWithLifecycle()
     val backingExport by viewModel.backingExport.collectAsStateWithLifecycle()
@@ -268,6 +283,8 @@ fun SessionRoute(
             mixes = mixes,
             practiceLoop = practiceLoop,
             guideVocalLevel = guideVocalLevel,
+            output = output,
+            latencyCorrection = latencyCorrection,
             guideVocalUnavailable = guideVocalUnavailable,
         ),
         actions = SessionActions(
@@ -304,6 +321,9 @@ fun SessionRoute(
             onMarkLoopEnd = viewModel::markLoopEnd,
             onClearLoop = viewModel::clearPracticeLoop,
             onGuideVocal = viewModel::setGuideVocalLevel,
+            onLatencyCorrection = viewModel::setLatencyCorrection,
+            onMonitoring = { on -> if (!on || micAllowed()) viewModel.setMonitoring(on) else monitoringPermission.launch(Manifest.permission.RECORD_AUDIO) },
+            onMonitoringLevel = viewModel::setMonitoringLevel,
         ),
     )
 }
@@ -380,6 +400,10 @@ data class SessionContent(
     /** The Guide Vocal in the headphones, 0..1, and why it can't be heard now, if it can't (#18). */
     val guideVocalLevel: Float = 0f,
     val guideVocalUnavailable: GuideVocalUnavailable? = null,
+    /** The Session's output, its round trip and Monitoring (#9); null until the Session is open. */
+    val output: SessionOutput? = null,
+    /** The Latency Correction of the Take in Review (#9). */
+    val latencyCorrection: LatencyCorrection? = null,
 )
 
 data class SessionActions(
@@ -416,6 +440,9 @@ data class SessionActions(
     val onMarkLoopEnd: () -> Unit = {},
     val onClearLoop: () -> Unit = {},
     val onGuideVocal: (Float) -> Unit = {},
+    val onLatencyCorrection: (Int) -> Unit = {},
+    val onMonitoring: (Boolean) -> Unit = {},
+    val onMonitoringLevel: (Float) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -525,7 +552,13 @@ private fun SessionControls(openError: UiText?, content: SessionContent, actions
             // A Vocal-Free Track has no Instrumental: it always plays its Original Audio (ADR 14).
             if (!track.vocalFree) BackingChoiceRow(track, content.backing, actions.onChooseBacking)
             Position(content.state, content.playback, content.practiceLoop, actions.onSeek)
-            Transport(content.state, content.playback, content.reviewBackingDb, actions)
+            Transport(content.state, content.playback, content.reviewBackingDb, content.latencyCorrection, actions)
+            // The microphone hears the speaker (#9).
+            val recordingOrAboutTo = content.state == SessionState.Idle || content.state is SessionState.CountingDown ||
+                content.state is SessionState.Recording
+            if (recordingOrAboutTo && content.output?.withoutHeadphones == true) {
+                Text(stringResource(R.string.session_without_headphones), style = MaterialTheme.typography.bodySmall, color = MeaVoxTheme.colors.record)
+            }
             PracticeLoopRow(content.practiceLoop, content.state, actions)
             TransposeControl(content.transpose, content.state, actions.onTranspose)
             GuideVocalControl(
@@ -533,6 +566,7 @@ private fun SessionControls(openError: UiText?, content: SessionContent, actions
                 onChange = actions.onGuideVocal,
             )
             Microphone(content.input, content.inputGainDb, actions.onGain)
+            content.output?.let { OutputPanel(it, content.state == SessionState.Idle, actions) }
             SettingRow(stringResource(R.string.session_countdown, Session.COUNTDOWN_SECONDS), content.countdownEnabled, actions.onCountdown)
             Takes(content.takes, content.state, actions)
             MixesSection(content.mixes, content.takes, actions.onEditMix, actions.onDeleteMix)
@@ -768,7 +802,7 @@ private fun PracticeLoopRow(loop: PracticeLoop?, state: SessionState, actions: S
 }
 
 @Composable
-private fun Transport(state: SessionState, playback: Playback, reviewBackingDb: Float, actions: SessionActions) {
+private fun Transport(state: SessionState, playback: Playback, reviewBackingDb: Float, correction: LatencyCorrection?, actions: SessionActions) {
     when (state) {
         SessionState.Idle -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NeutralOutlinedButton(
@@ -807,7 +841,7 @@ private fun Transport(state: SessionState, playback: Playback, reviewBackingDb: 
             }
             StopButton(actions.onStop)
         }
-        is SessionState.Review -> Review(state.take, state.transpose, playback, reviewBackingDb, actions)
+        is SessionState.Review -> Review(state.take, state.transpose, playback, reviewBackingDb, correction, actions)
         is SessionState.PlayingTake -> Panel(spacing = 12.dp) {
             Text(stringResource(R.string.session_playing_take, state.take.name), style = MaterialTheme.typography.titleMedium)
             NeutralOutlinedButton(stringResource(R.string.action_stop), actions.onStop, Modifier.height(44.dp))
@@ -901,7 +935,14 @@ private fun StopButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun Review(take: CapturedTake, transpose: Transpose, playback: Playback, reviewBackingDb: Float, actions: SessionActions) {
+private fun Review(
+    take: CapturedTake,
+    transpose: Transpose,
+    playback: Playback,
+    reviewBackingDb: Float,
+    correction: LatencyCorrection?,
+    actions: SessionActions,
+) {
     Panel(spacing = 12.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(stringResource(R.string.session_review), style = MaterialTheme.typography.titleLarge)
@@ -934,7 +975,82 @@ private fun Review(take: CapturedTake, transpose: Transpose, playback: Playback,
             ) { Text(stringResource(R.string.session_record_again)) }
         }
         ReviewBalance(reviewBackingDb, actions.onReviewBalance)
+        correction?.let { LatencyCorrectionControl(it, actions.onLatencyCorrection) }
     }
+}
+
+/**
+ * The Latency Correction of the route and path the Take was recorded on, set by ear (#9, ADR 23). Shown like the
+ * Vocal Nudge, later positive: a correction is extra latency, so it moves the voice earlier.
+ */
+@Composable
+private fun LatencyCorrectionControl(correction: LatencyCorrection, onChange: (Int) -> Unit) {
+    val output = correction.route.label().let { if (correction.path == OutputPath.LowLatency) stringResource(R.string.session_route_monitoring, it) else it }
+    VocalShiftControl(stringResource(R.string.session_latency_correction, output), -correction.ms, Session.MAX_LATENCY_CORRECTION_MS, { onChange(-it) }) {
+        // Not yet checked on this output: ask to listen (#9).
+        Text(
+            stringResource(if (correction.checked) R.string.session_latency_kept else R.string.session_latency_check),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (correction.checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+/**
+ * Where the Session plays to, its round trip, and Monitoring (#9, ADR 13, ADR 16): switched only in free playback,
+ * and only over wired or USB headphones.
+ */
+@Composable
+private fun OutputPanel(output: SessionOutput, idle: Boolean, actions: SessionActions) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val small = MaterialTheme.typography.bodySmall
+    Panel(spacing = 10.dp) {
+        Text(stringResource(R.string.session_output, output.route?.label() ?: stringResource(R.string.device_unknown)), style = MaterialTheme.typography.labelLarge)
+        output.roundTripMs?.let {
+            Text(stringResource(if (output.corrected) R.string.session_round_trip_corrected else R.string.session_round_trip, it), style = small, color = muted)
+        }
+        val unavailable = output.monitoringUnavailable
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(stringResource(R.string.session_monitoring), Modifier.weight(1f), style = rowLabel())
+            Switch(
+                checked = output.monitoring,
+                onCheckedChange = actions.onMonitoring,
+                // Switching it on opens the microphone, asking for the permission first if needed.
+                enabled = idle && (unavailable == null || output.monitoring),
+            )
+        }
+        when {
+            unavailable != null -> Text(stringResource(unavailable.text()), style = small, color = muted)
+            !output.monitoring -> Text(stringResource(R.string.session_monitoring_hint), style = small, color = muted)
+        }
+        if (output.monitoringDelayed) {
+            Text(stringResource(R.string.session_monitoring_delayed, output.roundTripMs ?: 0), style = small, color = MeaVoxTheme.colors.record)
+        }
+        if (output.monitoring) {
+            var dragLevel by remember { mutableStateOf<Float?>(null) }
+            val shown = dragLevel ?: output.monitoringLevel
+            Text(stringResource(R.string.session_monitoring_level, percent(LocalResources.current, shown)), style = small, color = muted)
+            Slider(
+                value = shown,
+                onValueChange = {
+                    dragLevel = it
+                    actions.onMonitoringLevel(it)
+                },
+                onValueChangeFinished = { dragLevel = null },
+                colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        // An interface with its own headphone jack monitors without delay (ADR 13).
+        if (output.route == OutputRoute.Usb) Text(stringResource(R.string.session_monitoring_usb_hint), style = small, color = muted)
+    }
+}
+
+@StringRes
+private fun MonitoringUnavailable.text(): Int = when (this) {
+    MonitoringUnavailable.Speaker -> R.string.session_monitoring_speaker
+    MonitoringUnavailable.Bluetooth -> R.string.session_monitoring_bluetooth
+    MonitoringUnavailable.UnknownOutput -> R.string.session_monitoring_unknown
 }
 
 /** How loud the Backing Audio plays under the Take while listening back; the Take is unchanged. */

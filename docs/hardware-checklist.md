@@ -15,7 +15,7 @@ Prerequisites: a Track imported from a local file, wired headphones, and a way t
    - In Review your voice is clearly audible over the backing at the default balance (backing −20 dB).
    - Moving the balance slider changes the backing level live.
    - The balance setting is still there in the next Session, and it also applies when playing kept Takes.
-6. **Alignment (loopback).** Load a song with clear transients and record 20 s while holding an earbud against the mic. In Review, the recorded copy should sit on the played audio. It may be off by a few ms, because only the engine's latency estimate is applied until Latency Calibration (#9).
+6. **Alignment (loopback).** Load a song with clear transients and record 20 s while holding an earbud against the mic. In Review, the recorded copy should sit on the played audio. It may be off by a few ms, because only the engine's latency estimate and the route's Latency Correction (#9) are applied.
 7. **Xrun during a Take (ADR 13).** Record a loopback Take of 3 minutes while using the phone heavily: scroll, switch apps, lock and unlock. Check `adb logcat -s MeaVoxEngine` for `frames corrected after output xruns`. Play the kept Take: it must stay aligned to the end, with no growing offset after a glitch.
 8. **Stored Takes.** Play a kept Take from the list: it plays against the Backing Audio from its Start Position and stops at its end. Rename it, then delete it after confirming. Restart the app: the remaining Takes are listed and still play.
 9. **End of song.** Start recording 5 s before the end: Review opens by itself when the song ends.
@@ -111,3 +111,18 @@ Prerequisites: a Ready Track whose Last Transpose is not 0 (e.g. +2), a Track th
 6. **Vocal-Free.** On the Vocal-Free Track, export at +3: no layer choice is shown, and the file is "<Title> (Instrumental, +3).wav".
 7. **Cancel and share.** Cancel an export at about 30 %: no file is left in `Music/MeaVox/`. Close the sheet during an export: same result. After an export, Share sends a playable WAV.
 8. **24-bit.** Export at 24-bit: the file is 24-bit stereo at the Track's sample rate.
+
+## Latency Correction and Monitoring (#9)
+
+Prerequisites: a Ready Track with clear transients, wired headphones, and if possible a USB interface with headphones and a Bluetooth headset. For a loopback, hold an earbud against the microphone.
+
+1. **Timing hint.** On a route you never corrected, record a loopback Take: Review shows "Timing (wired)" at 0 ms with the hint to check the timing. Keep it: the next Take on that route shows "Kept for this output" instead.
+2. **Correcting by ear.** In Review, move "Timing" until the recorded copy sits on the playback: the Take moves while it plays. Keep it, then record and keep another: both play aligned from the list, and so does each one's Mix and its Export.
+3. **Earlier Takes stay.** Change the Timing a lot on a third Take and keep it: the first two still play as before.
+4. **Per route.** Switch to the speaker and record: Review starts at the speaker's own value. The "No headphones" warning shows before and while recording.
+5. **Monitoring over wired.** Monitoring is off when the Session opens. Switch it on in free playback: playback pauses, you hear yourself in the headphones (dry, at the level), the round trip shown drops, and if it is above 40 ms the delay warning shows. Change the level while singing. Record: you hear yourself while recording, and not in Review. The Take sounds the same as without Monitoring. Its Review starts at the low-latency path's own Timing ("wired, Monitoring").
+6. **Thinner sound.** With Monitoring on, the Backing Audio may sound thinner (no speaker processing on the low-latency path, ADR 16). Switch it off: the full sound is back.
+7. **Not on the speaker or Bluetooth.** On the speaker and over Bluetooth the switch is disabled, with the reason.
+8. **USB.** Over a USB interface, the switch is available, and the hint about Hardware Monitoring shows.
+9. **Route change.** With Monitoring on, unplug the headphones during playback and during a recording: nothing crashes or freezes, a recording ends in Review with what was recorded, Monitoring is off, and the output shows the speaker. Plug them back in: Monitoring stays off until switched on, and recording works.
+10. **Next Session.** Leave and reopen the Track: Monitoring is off, its level is the one set before.

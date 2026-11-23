@@ -25,10 +25,10 @@ Ubiquitous language for the project. Decisions are recorded in `docs/adr/`. The 
 | **Guide Vocal** | Leitstimme | The Vocal Stem blended into the headphones (Session) or into a Mix at low level. Never recorded; silent while recording without headphones, and in Review. In a Mix it is part of the Backing Audio: blended into the Instrumental before Transpose, at a level from 0 (none) to 1 (as in the Original Audio). Only over an Instrumental. See ADR 7, ADR 9. |
 | **Review** | Anhören | Post-recording playback of a Take with Keep / Discard / Record again. |
 | **Review Balance** | Playback beim Anhören | The level of the Backing Audio under a Take while it plays back (Review and kept Takes), lower than the Take by default so the voice can be judged. Only for listening; a new Mix starts at it. _Avoid_: review volume, playback balance. |
-| **Monitoring** | Mithören | Optional, dry, real-time software routing of the mic to **wired/USB** headphones during a Session. Never over Bluetooth. Warns when the measured round trip is high. See ADR 4, ADR 13. |
+| **Monitoring** | Mithören | Optional, dry, real-time software routing of the mic to **wired/USB** headphones during a Session, off at the start of every Session and after a route change. Never over Bluetooth. While it is on, the Session output takes the low-latency path. Warns when the round trip is above 40 ms. See ADR 4, ADR 13, ADR 16, ADR 23. |
 | **Hardware Monitoring** | Hardware-Mithören | Zero-latency monitoring done by the audio interface itself (e.g. a USB mic's headphone jack), outside the app. Preferred over Monitoring when available. |
 | **Audio Engine** | — (not named in the UI) | Native (C++/Oboe) component that owns the Session timeline: playback, Transpose, capture, Monitoring. |
-| **Latency Calibration** | Latenzkalibrierung | Per-device/route measurement of the input/output offset, applied to Takes so they align. |
+| **Latency Correction** | Latenz-Korrektur | How much later than the platform reports the microphone is against the playback, per output route and output path, set by ear in Review ("Timing") and kept with each Take recorded there. It replaced the planned Latency Calibration. See ADR 23. |
 | **Transpose** | Transponieren | Pitch-shift of Backing Audio (and guide Vocal Stem) by −6…+6 semitones, tempo unchanged. A property of each Take. See ADR 5. |
 | **Last Transpose** | — (not named in the UI) | The Transpose a Track's control was last set to in a Session, whether or not a Take was kept. A new Session for the Track starts at it. It never changes existing Takes. _Avoid_: default transpose, saved key. |
 | **Lyrics** | Songtext | Text of the song, from a LyricsProvider (LRCLIB first) or user edits; *plain* or *line-synced*. See ADR 6. |
@@ -38,7 +38,7 @@ Ubiquitous language for the project. Decisions are recorded in `docs/adr/`. The 
 | **Karaoke View** | Karaoke-Ansicht | Time-synced display: the current line is highlighted and word progress is interpolated within the line. Requires synced Lyrics. |
 | **Mix** | Mix | Non-destructive combination of one Backing Audio + one Take + Mix Settings, spanning the Take (and a reverb's tail). Heard in a Mix Preview; rendered only for Export. See ADR 7. |
 | **Mix Settings** | Mix-Einstellungen | Backing level, vocal level, Vocal Nudge, guide-vocal level, Vocal Effects. |
-| **Vocal Nudge** | Gesang verschieben | Manual ±200 ms alignment of a Take, applied on top of Latency Calibration. |
+| **Vocal Nudge** | Gesang verschieben | Manual ±200 ms alignment of a Take in its Mix, applied on top of the Latency Correction. |
 | **Vocal Effects** | Gesangseffekte | Mix-time presets for the Take: a reverb (Dry, Room or Hall), gentle compression and a high-pass filter. Heard in the Mix Preview and rendered into an Export; never applied to Monitoring or Review. A reverb makes the Mix run on for its tail. See ADR 7. |
 | **Mix Editor** | Mix bearbeiten | Where one Mix's Backing Audio and Mix Settings are changed, heard in a Mix Preview and exported. _Avoid_: mixer. |
 | **Mix Preview** | Vorschau | A Mix played in the Session as it will be exported, from its Take's Start Position until the Take ends (and a reverb's tail has rung out); changes to its Mix Settings are heard at once. _Avoid_: mix playback. |

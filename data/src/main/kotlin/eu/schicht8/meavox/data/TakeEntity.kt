@@ -39,6 +39,8 @@ internal data class TakeEntity(
     // Takes from before Transpose (#10) were all sung untransposed.
     @ColumnInfo(name = "transpose", defaultValue = "0") val transpose: Int,
     @ColumnInfo(name = "recorded_at") val recordedAt: Long,
+    /** The Latency Correction it was kept with (version 17, #9); Takes from before have none. */
+    @ColumnInfo(name = "latency_correction_ms", defaultValue = "0") val latencyCorrectionMs: Int = 0,
 )
 
 internal fun Take.toEntity() = TakeEntity(
@@ -53,6 +55,7 @@ internal fun Take.toEntity() = TakeEntity(
     reportedLatencyFrames = reportedLatencyFrames,
     transpose = transpose.semitones,
     recordedAt = recordedAt,
+    latencyCorrectionMs = latencyCorrectionMs,
 )
 
 internal fun TakeEntity.toTake() = Take(
@@ -66,10 +69,11 @@ internal fun TakeEntity.toTake() = Take(
     reportedLatencyFrames = reportedLatencyFrames,
     transpose = Transpose.clamped(transpose),
     recordedAt = recordedAt,
+    latencyCorrectionMs = latencyCorrectionMs,
 )
 
 // Stored as stable strings so enum renames don't corrupt data.
-private fun OutputRoute.toColumn(): String = when (this) {
+internal fun OutputRoute.toColumn(): String = when (this) {
     OutputRoute.Speaker -> "speaker"
     OutputRoute.Wired -> "wired"
     OutputRoute.Usb -> "usb"

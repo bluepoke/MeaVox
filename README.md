@@ -71,7 +71,7 @@ Target platform: Android 10+ (minSdk 29), `arm64-v8a` (plus `x86_64` for the emu
 
 - Playback decodes the whole Original Audio into memory (float stereo, about 11.5 MB per minute at 48 kHz). That's fine for songs, but long videos use a lot of memory. Streaming from disk comes with the stored-stems work (ADR 8).
 - A file the device can't decode is still imported as a Downloaded Track; it fails when played. A Failed pipeline state comes with the download pipeline. If decoding fails part-way through a file, the part decoded so far stays playable.
-- Until Latency Calibration (#9) lands, Takes are aligned with the latency the engine reports when recording starts, which can be off by a few milliseconds. Output xruns during a Take are corrected (ADR 13). Input overruns are not: they are rare, because the input buffer holds twice the output's capacity.
+- Takes are aligned with the latency the engine reports when recording starts, plus a Latency Correction set by ear in Review per output route and path (ADR 23). Output xruns during a Take are corrected (ADR 13). Input overruns are not: they are rare, because the input buffer holds twice the output's capacity.
 - While a Take is recorded or reviewed, its audio is held in memory (mono float, about 11.5 MB per minute at 48 kHz) on top of the Backing Audio.
 
 ## Distribution

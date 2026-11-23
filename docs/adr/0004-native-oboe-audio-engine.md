@@ -1,6 +1,6 @@
 # 4. Native Oboe audio engine owns the Session timeline; Monitoring is wired-only and dry
 
-- Status: Accepted, amended by [ADR 13](0013-monitoring-and-take-alignment-after-engine-spike.md) (latency warning instead of a latency target, Hardware Monitoring hint, timestamp-based Take alignment), [ADR 16](0016-session-output-normal-path-unless-monitoring.md) (normal output path unless Monitoring is on) and [ADR 18](0018-video-streaming-only-backlog.md) (video is a streaming-only nice to have)
+- Status: Accepted, amended by [ADR 13](0013-monitoring-and-take-alignment-after-engine-spike.md) (latency warning instead of a latency target, Hardware Monitoring hint, timestamp-based Take alignment), [ADR 16](0016-session-output-normal-path-unless-monitoring.md) (normal output path unless Monitoring is on), [ADR 18](0018-video-streaming-only-backlog.md) (video is a streaming-only nice to have) and [ADR 23](0023-latency-correction-by-ear-and-monitoring.md) (a Latency Correction by ear instead of Latency Calibration)
 - Date: 2026-11-14
 
 ## Context

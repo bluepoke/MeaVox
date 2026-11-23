@@ -4,6 +4,7 @@ package eu.schicht8.meavox.core.port
 import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.InputDevice
+import eu.schicht8.meavox.core.model.OutputPath
 import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.Transpose
 import kotlinx.coroutines.flow.StateFlow
@@ -11,8 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * The native Audio Engine as the domain sees it (ADR 4, ADR 13). It plays one loaded Backing
  * Audio file. In a Session it also records the microphone on the same timeline and plays a Take
- * back against the Backing Audio, each at its own Transpose (ADR 5). Monitoring is added by a
- * later slice.
+ * back against the Backing Audio, each at its own Transpose (ADR 5), and can monitor the
+ * microphone (#9).
  */
 interface AudioEngine {
     val playback: StateFlow<Playback>
@@ -74,6 +75,20 @@ interface AudioEngine {
 
     /** Where the Session's output goes now, e.g. to decide what may be heard while recording. */
     suspend fun currentOutputRoute(): OutputRoute
+
+    /** The Session's output as it is now (#9); [OutputStatus.Off] outside a Session. */
+    val output: StateFlow<OutputStatus>
+
+    /**
+     * Monitoring (#9, ADR 13): the dry microphone, untransposed, at [setMonitoringLevel], added to the
+     * output in free playback and while recording, never into the Take, and not while a Take plays.
+     * Switching it reopens the Session output, on the low-latency path while it is on and the normal path
+     * otherwise (ADR 16), which pauses playback. A route change switches it off. Returns whether it is on.
+     */
+    suspend fun setMonitoring(enabled: Boolean): Boolean
+
+    /** Level of Monitoring, 0..1. */
+    fun setMonitoringLevel(level: Float)
 
     /** Digital gain applied to the microphone before metering and recording, in dB. */
     fun setInputGain(gainDb: Float)
@@ -189,9 +204,25 @@ data class CapturedTake(
     val route: OutputRoute,
     /** The engine's round-trip estimate (output + input latency) when recording started. */
     val reportedLatencyFrames: Long,
+    /** The output path it was recorded on (ADR 16): low-latency while Monitoring was on. */
+    val path: OutputPath = OutputPath.Normal,
 ) {
     val startPositionMs: Long get() = startFrame * 1000 / sampleRate
     val durationMs: Long get() = frames * 1000 / sampleRate
+}
+
+/** The Session's output (#9): where it goes, on which path, and whether Monitoring is on. */
+data class OutputStatus(
+    /** Null while the Session's output isn't open. */
+    val route: OutputRoute?,
+    val path: OutputPath,
+    val monitoring: Boolean,
+    /** Output + input latency as the platform reports it, while the microphone is open (ADR 13). */
+    val reportedLatencyMs: Int?,
+) {
+    companion object {
+        val Off = OutputStatus(route = null, path = OutputPath.Normal, monitoring = false, reportedLatencyMs = null)
+    }
 }
 
 /** The open microphone as seen by the meter (ADR 9). */

@@ -33,9 +33,11 @@ import eu.schicht8.meavox.core.port.ExportedFile
 import eu.schicht8.meavox.core.port.InputLevel
 import eu.schicht8.meavox.core.port.Playback
 import eu.schicht8.meavox.core.session.BackingAudio
+import eu.schicht8.meavox.core.session.LatencyCorrection
 import eu.schicht8.meavox.core.session.MicrophoneUnavailable
 import eu.schicht8.meavox.core.session.PracticeLoop
 import eu.schicht8.meavox.core.session.Session
+import eu.schicht8.meavox.core.session.SessionOutput
 import eu.schicht8.meavox.core.session.SessionState
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.separating.ModelChoices
@@ -193,6 +195,8 @@ class SessionViewModel(
     val practiceLoop: StateFlow<PracticeLoop?> = from(null) { it.practiceLoop }
     val guideVocalLevel: StateFlow<Float> = from(0f) { it.guideVocalLevel }
     val guideVocalUnavailable: StateFlow<GuideVocalUnavailable?> = from(null) { it.guideVocalUnavailable }
+    val output: StateFlow<SessionOutput?> = from(null) { it.output }
+    val latencyCorrection: StateFlow<LatencyCorrection?> = from(null) { it.latencyCorrection }
 
     init {
         viewModelScope.launch {
@@ -270,6 +274,13 @@ class SessionViewModel(
     fun clearPracticeLoop() = act { it.clearPracticeLoop() }
 
     fun setGuideVocalLevel(level: Float) = act { it.setGuideVocalLevel(level) }
+
+    /** Sets the Latency Correction of the Take in Review's route and path, by ear (#9). */
+    fun setLatencyCorrection(ms: Int) = act { it.setLatencyCorrection(ms) }
+
+    fun setMonitoring(enabled: Boolean) = act { it.setMonitoring(enabled) }
+
+    fun setMonitoringLevel(level: Float) = act { it.setMonitoringLevel(level) }
 
     private fun act(block: suspend (Session) -> Unit) {
         val open = session.value ?: return

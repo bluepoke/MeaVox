@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.first
 
 /** What a Mix plays now: its Take over [backing], which may differ from the stored Mix after re-separation. */
 internal data class MixParts(val mix: Mix, val track: Track, val take: Take, val backing: BackingAudio) {
-    /** Frames the Take is moved earlier (Latency Calibration offset minus the Vocal Nudge). */
+    /** Frames the Take is moved earlier (its latency with the Latency Correction, minus the Vocal Nudge). */
     fun alignmentFrames(settings: MixSettings = mix.settings): Long = take.alignmentFrames(settings)
 
     /** The Vocal Stem blended in as the Guide Vocal, if the Mix can have one and wants it. */

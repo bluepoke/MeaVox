@@ -1,6 +1,6 @@
 # 13. Monitoring latency warning, Hardware Monitoring hint, timestamp-based Take alignment
 
-- Status: Accepted (amends ADR 4)
+- Status: Accepted (amends ADR 4; amended by ADR 16, ADR 23)
 - Date: 2026-11-15
 
 ## Context
@@ -23,6 +23,6 @@ The Audio Engine spike (#2, findings in `docs/spikes/audio-engine-spike.md`) mea
 
 ## Consequences
 - The 40 ms threshold is a guess between the measured points (0 ms Hardware Monitoring = 5, about 83 ms = 3). It must be revisited once a low-latency device (exclusive/MMAP) has been measured with the spike protocol.
-- Latency Calibration (click detection) is kept as the production approach. Whether three runs agree within ±2 ms was not recorded, so repeatability is still to be confirmed.
+- Latency Calibration (click detection) was kept as the production approach. ADR 23 replaced it with a Latency Correction by ear, per route and output path, so its repeatability no longer needs confirming.
 - Take alignment tests in the Audio Engine (Seam 2 and hardware checklists) must include an injected xrun and verify that the Take stays aligned.
 - Clapping is unsuitable for measuring alignment (people clap 20–50 ms ahead of a regular click). Alignment is verified with acoustic loopback only.

@@ -190,6 +190,7 @@ class MigrationTest(private val from: Int) {
             "compression" to 1L,
             "high_pass" to 1L,
             "guide_vocal_level" to 0.25,
+            "latency_correction_ms" to 25L,
         )
     }
 }

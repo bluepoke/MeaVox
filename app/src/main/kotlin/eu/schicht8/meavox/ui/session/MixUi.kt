@@ -322,36 +322,46 @@ internal fun GuideVocalControl(level: Float, unavailable: GuideVocalUnavailable?
     }
 }
 
-/** Vocal Nudge: ±200 ms in 5 ms steps on top of Latency Calibration; later is positive. */
+/** Vocal Nudge: ±200 ms in 5 ms steps on top of the Latency Correction; later is positive. */
 @Composable
 private fun NudgeControl(nudgeMs: Int, onChange: (Int) -> Unit) {
-    val max = MixSettings.MAX_NUDGE_MS
-    fun step(delta: Int) = onChange((nudgeMs + delta).coerceIn(-max, max))
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.mix_vocal_nudge), Modifier.weight(1f), style = rowLabel())
-            StepButton("−", stringResource(R.string.mix_vocal_earlier), enabled = nudgeMs > -max) { step(-NUDGE_STEP_MS) }
-            Text(
-                nudgeLabel(nudgeMs),
-                Modifier.width(72.dp),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center,
-            )
-            StepButton("+", stringResource(R.string.mix_vocal_later), enabled = nudgeMs < max) { step(NUDGE_STEP_MS) }
-        }
-        Slider(
-            value = nudgeMs.toFloat(),
-            onValueChange = { onChange(((it / NUDGE_STEP_MS).roundToInt() * NUDGE_STEP_MS).coerceIn(-max, max)) },
-            valueRange = -max.toFloat()..max.toFloat(),
-            colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer),
-            modifier = Modifier.fillMaxWidth(),
-        )
+    VocalShiftControl(stringResource(R.string.mix_vocal_nudge), nudgeMs, MixSettings.MAX_NUDGE_MS, onChange) {
         Text(
             stringResource(R.string.mix_vocal_nudge_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * Moves the voice against the backing by [shiftMs], later positive, within ±[max] ms in 5 ms steps: the Vocal Nudge
+ * of a Mix, and the Timing (Latency Correction) in Review. [hint] goes below.
+ */
+@Composable
+internal fun VocalShiftControl(label: String, shiftMs: Int, max: Int, onChange: (Int) -> Unit, hint: @Composable () -> Unit) {
+    fun step(delta: Int) = onChange((shiftMs + delta).coerceIn(-max, max))
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(label, Modifier.weight(1f), style = rowLabel())
+            StepButton("−", stringResource(R.string.mix_vocal_earlier), enabled = shiftMs > -max) { step(-NUDGE_STEP_MS) }
+            Text(
+                nudgeLabel(shiftMs),
+                Modifier.width(72.dp),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+            )
+            StepButton("+", stringResource(R.string.mix_vocal_later), enabled = shiftMs < max) { step(NUDGE_STEP_MS) }
+        }
+        Slider(
+            value = shiftMs.toFloat(),
+            onValueChange = { onChange(((it / NUDGE_STEP_MS).roundToInt() * NUDGE_STEP_MS).coerceIn(-max, max)) },
+            valueRange = -max.toFloat()..max.toFloat(),
+            colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        hint()
     }
 }
 

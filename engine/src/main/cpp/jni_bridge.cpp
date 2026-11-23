@@ -45,6 +45,23 @@ JNI_FN(void, renderHeadless)(JNIEnv *env, jobject, jlong h, jfloatArray out, jin
     env->ReleaseFloatArrayElements(out, samples, 0);  // copy back
 }
 
+JNI_FN(void, renderHeadlessWithInput)(JNIEnv *env, jobject, jlong h, jfloatArray out, jint frames, jfloatArray in, jint inFrames) {
+    jfloat *samples = env->GetFloatArrayElements(out, nullptr);
+    if (!samples) return;
+    withSamples(env, in, [&](const jfloat *mic) { engine(h).renderHeadless(samples, frames, mic, inFrames); });
+    env->ReleaseFloatArrayElements(out, samples, 0);  // copy back
+}
+
+JNI_FN(jboolean, setMonitoring)(JNIEnv *, jobject, jlong h, jboolean enabled) {
+    return engine(h).setMonitoring(enabled == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNI_FN(void, setMonitoringLevel)(JNIEnv *, jobject, jlong h, jfloat level) { engine(h).setMonitoringLevel(level); }
+
+JNI_FN(jboolean, monitoring)(JNIEnv *, jobject, jlong h) { return engine(h).monitoring() ? JNI_TRUE : JNI_FALSE; }
+
+JNI_FN(jlong, reportedLatencyFrames)(JNIEnv *, jobject, jlong h) { return engine(h).reportedLatencyFrames(); }
+
 JNI_FN(void, destroyHeadless)(JNIEnv *, jobject, jlong h) { delete reinterpret_cast<PlaybackEngine *>(h); }
 
 JNI_FN(void, beginLoad)(JNIEnv *, jobject, jlong h, jint channels, jint sampleRate, jlong estimatedFrames) {
