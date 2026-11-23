@@ -12,12 +12,12 @@ The separation spike (#3, findings in `docs/spikes/separation-spike.md`) ran ADR
 - **UVR MDX-Net Karaoke** (RTF 1.34) failed the Fast bound and was clearly worse than Inst HQ 4. **Inst HQ 3** was slower than HQ 4 at the same rating. **RoFormer models** were estimated at 10–34× htdemucs' compute, with unclear weight licenses.
 - XNNPACK was slower than the plain CPU execution provider, and NNAPI was no faster (it's also deprecated in Android 15). Turning ORT's CPU arena off saved about 690 MB on Inst HQ 4 at the same speed.
 - Every run produced stems exactly as long as the input, with lag 0. Peak RSS was the same on both songs, so chunked Separation keeps memory bounded by one segment.
-- The Inst HQ 4 weights have no valid license yet. The UVR authors were asked on 2026-11-17 ([UVR #2444](https://github.com/Anjok07/ultimatevocalremovergui/issues/2444)). The Spleeter weight license is also still to be confirmed.
+- The Inst HQ 4 weights have no valid license yet. The UVR authors were asked on 2026-11-17 ([UVR #2444](https://github.com/Anjok07/ultimatevocalremovergui/issues/2444)). The Spleeter weights turned out to be MIT, like its code (see the note on #29).
 
 ## Decision
 - **Runtime:** ONNX Runtime (`onnxruntime-android`, MIT) on the **CPU execution provider**, 4 threads, with the **CPU arena and memory-pattern optimisation off**. No XNNPACK or NNAPI.
 - **Catalogue for the first release.** Both models are **downloaded on demand**, not bundled:
-  - *Fast:* **Spleeter 2-stems, fp32** (75 MB), once its weight license is confirmed. It separates up to 11 kHz only, so the Instrumental keeps the band above. Backing vocals stay in the Instrumental. Its quality is that of a quick first version, not a clean karaoke track.
+  - *Fast:* **Spleeter 2-stems, fp32** (75 MB). Its weights are MIT (note on #29). It separates up to 11 kHz only, so the Instrumental keeps the band above. Backing vocals stay in the Instrumental. Its quality is that of a quick first version, not a clean karaoke track.
   - *Best:* **UVR MDX-Net Inst HQ 4** (59 MB), **only once its authors license the weights**. It removes backing vocals along with the lead vocal. Its STFT parameters (n_fft 5120, dim_f 2560, compensate 1.019) aren't in the ONNX file, so they ship with the catalogue entry.
   - If the Inst HQ 4 license is refused or doesn't arrive in time, the first release ships Fast only, and another Best candidate is looked for (Demucs with less memory, or another architecture).
 - **Not offered:** Demucs v4, UVR MDX-Net Karaoke, Inst HQ 3, RoFormer models (reasons above).
@@ -45,3 +45,9 @@ The separation spike (#3, findings in `docs/spikes/separation-spike.md`) ran ADR
 - Android 15 limits `dataSync` and `mediaProcessing` foreground services to 6 hours a day. That is enough for Fast; Best (#17) has to be checked against it.
 - Only one device was measured. Thread counts 2 / 4 / 8 weren't compared on the CPU provider, and the XNNPACK and NNAPI runs weren't clean one-factor comparisons.
 - The spike's shortcuts (no checksums or resumable downloads, raw temp files, 16-bit WAV stems, foreground-only runs) are listed in the findings and must not be copied into production.
+
+## Note: Spleeter weight license confirmed (#29, 2026-11-23)
+- Deezer's JOSS paper on Spleeter covers the pretrained models explicitly: "Spleeter … source code and pre-trained models are available on github and distributed under a MIT license." (Hennequin, Khlif, Voituret & Moussallam, *Spleeter: a fast and efficient music source separation tool with pre-trained models*, JOSS 5(50), 2154, 2020, [doi:10.21105/joss.02154](https://doi.org/10.21105/joss.02154)). The repository's [LICENSE](https://github.com/deezer/spleeter/blob/master/LICENSE) is MIT, "Copyright (c) 2019-present, Deezer SA."
+- MIT allows redistribution, also by a GPL-3.0-or-later app (ADR 11), as long as the copyright notice and the license text go with it. The text is in [`docs/licenses/MIT-Spleeter.txt`](../licenses/MIT-Spleeter.txt). The project's release asset for the Fast model and the in-app license list (#21) carry it.
+- The app uses sherpa-onnx's ONNX export of these weights (#7). The export converts the format and keeps the weights, so the MIT terms still apply.
+- So the Fast model can be hosted as a project release asset (#21). Medium and Best are still waiting on the UVR authors (UVR #2444, ADR 19).
