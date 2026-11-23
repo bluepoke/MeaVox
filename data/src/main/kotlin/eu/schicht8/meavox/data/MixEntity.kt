@@ -14,6 +14,7 @@ import eu.schicht8.meavox.core.mix.Mix
 import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.MixRepository
 import eu.schicht8.meavox.core.mix.MixSettings
+import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.TakeId
@@ -48,6 +49,12 @@ internal data class MixEntity(
     @ColumnInfo(name = "vocal_db") val vocalDb: Float,
     @ColumnInfo(name = "vocal_nudge_ms") val vocalNudgeMs: Int,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+    /** The reverb preset (version 15, #16): `room` or `hall`; null for Dry, as for Mixes from before. */
+    @ColumnInfo(name = "reverb") val reverb: String? = null,
+    @ColumnInfo(name = "compression", defaultValue = "0") val compression: Boolean = false,
+    @ColumnInfo(name = "high_pass", defaultValue = "0") val highPass: Boolean = false,
+    /** The Guide Vocal level, 0..1 (version 15, #16). */
+    @ColumnInfo(name = "guide_vocal_level", defaultValue = "0") val guideVocalLevel: Float = 0f,
 )
 
 internal fun Mix.toEntity() = MixEntity(
@@ -61,6 +68,10 @@ internal fun Mix.toEntity() = MixEntity(
     vocalDb = settings.vocalDb,
     vocalNudgeMs = settings.vocalNudgeMs,
     createdAt = createdAt,
+    reverb = settings.effects.reverb.toColumn(),
+    compression = settings.effects.compression,
+    highPass = settings.effects.highPass,
+    guideVocalLevel = settings.guideVocalLevel,
 )
 
 internal fun MixEntity.toMix() = Mix(
@@ -70,9 +81,29 @@ internal fun MixEntity.toMix() = Mix(
     name = name,
     backing = instrumentalModel?.let { BackingAudio.Instrumental(SeparationModelId(it)) } ?: BackingAudio.OriginalAudio,
     // Clamped: a row is never refused for a value out of today's range.
-    settings = MixSettings.clamped(backingDb, vocalDb, vocalNudgeMs),
+    settings = MixSettings.clamped(
+        backingDb,
+        vocalDb,
+        vocalNudgeMs,
+        VocalEffects(reverbFromColumn(reverb), compression, highPass),
+        guideVocalLevel,
+    ),
     createdAt = createdAt,
 )
+
+/** Stored as stable strings so enum renames don't corrupt data; Dry as null. */
+private fun VocalEffects.Reverb.toColumn(): String? = when (this) {
+    VocalEffects.Reverb.Dry -> null
+    VocalEffects.Reverb.Room -> "room"
+    VocalEffects.Reverb.Hall -> "hall"
+}
+
+/** A preset from a later version that this one doesn't know plays Dry. */
+private fun reverbFromColumn(value: String?): VocalEffects.Reverb = when (value) {
+    "room" -> VocalEffects.Reverb.Room
+    "hall" -> VocalEffects.Reverb.Hall
+    else -> VocalEffects.Reverb.Dry
+}
 
 @Dao
 internal interface MixDao {

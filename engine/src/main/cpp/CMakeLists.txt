@@ -46,6 +46,7 @@ add_library(meavox_engine SHARED
         BackingRenderer.cpp
         PlaybackEngine.cpp
         OfflineMixRender.cpp
+        VocalEffects.cpp
         jni_bridge.cpp
         mix_render_jni.cpp
         flac_files.cpp

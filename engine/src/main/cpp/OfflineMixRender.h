@@ -5,6 +5,9 @@
 // (Review, the Mix Preview, a Session at a Transpose). The output is timeline frames [from, to) as
 // interleaved stereo float, or every frame of the Backing Audio with to = kUntilEnd.
 //
+// A Mix's Vocal Effects (#16) go on the Take; its Guide Vocal (a Vocal Stem, fed in step with the
+// Backing Audio) is added to the Backing Audio before it is transposed, as in the Mix Preview.
+//
 // Streaming: the Take is held whole (mono), but the Backing Audio is fed in order from frame 0 and
 // only a short window of it is kept, so a Session holding the same song in memory isn't doubled.
 //
@@ -25,7 +28,11 @@ public:
     static constexpr int64_t kUntilEnd = INT64_MAX;
 
     OfflineMixRender(int32_t sampleRate, int64_t from, int64_t to, int64_t takeStart, int64_t alignment, int transpose,
-                     float backingGain, float takeGain);
+                     float backingGain, float takeGain, VocalEffects effects = {}, float guideLevel = 0.0f);
+
+    // Appends Guide Vocal audio (stereo; mono to both), in order from timeline frame 0. Each Backing
+    // Audio frame is added to the Guide Vocal frame of the same index, so feed it first.
+    void appendGuide(const float *interleaved, int32_t frames, int32_t channels);
 
     // Appends Take audio (the first channel of each frame).
     void appendTake(const float *interleaved, int32_t frames, int32_t channels);
@@ -66,7 +73,11 @@ private:
     void renderAvailable();
 
     BackingRenderer mBacking;
+    VocalChain mEffects;
     Window mWindow;
+    const float mGuideLevel;
+    std::vector<float> mGuide;  // interleaved stereo Guide Vocal frames fed ahead of the Backing Audio
+    size_t mGuideRead = 0;      // samples of mGuide already added
     int64_t mFed = 0;  // Backing Audio frames received, from timeline frame 0
     bool mBackingEnded = false;
     bool mStarted = false;

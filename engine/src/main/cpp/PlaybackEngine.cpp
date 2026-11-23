@@ -34,6 +34,29 @@ void PlaybackEngine::freeBlocksLocked() {
     for (float *block : mBlocks) delete[] block;
     std::vector<float *>().swap(mBlocks);
     mDecoded.store(0);
+    freeGuideLocked();  // it belongs to the Backing Audio
+}
+
+// Only while the callback doesn't read the Guide Vocal: the stream is closed or the Take doesn't play.
+void PlaybackEngine::freeGuideLocked() {
+    mGuideDecoded.store(0);
+    for (float *block : mGuideBlocks) delete[] block;
+    std::vector<float *>().swap(mGuideBlocks);
+}
+
+PlaybackEngine::GuidedFrames::GuidedFrames(const StereoFrames &backing, const StereoFrames &guide)
+    : mBacking(backing), mGuide(guide), mScratch(static_cast<size_t>(kScratchFrames) * 2) {}
+
+const float *PlaybackEngine::GuidedFrames::at(int64_t frame, int64_t &contiguous) const {
+    const float *backing = mBacking.at(frame, contiguous);
+    // Past what is decoded of the Guide Vocal, the Backing Audio plays alone.
+    if (mLevel <= 0.0f || frame >= mGuideDecoded) return backing;
+    int64_t guideContiguous = 0;
+    const float *guide = mGuide.at(frame, guideContiguous);
+    const int64_t n = std::min({contiguous, guideContiguous, mGuideDecoded - frame, kScratchFrames});
+    for (int64_t i = 0; i < n * 2; ++i) mScratch[static_cast<size_t>(i)] = backing[i] + guide[i] * mLevel;
+    contiguous = n;
+    return mScratch.data();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -109,6 +132,7 @@ void PlaybackEngine::discardLoad() {
 
 // Only while no callback can run (the stream is closed).
 void PlaybackEngine::configureStretchLocked(int32_t sampleRate) {
+    mEffects.configure(sampleRate);
     const int32_t lead = mBacking.configure(sampleRate);
     LOGI("Transpose: stretcher at %d Hz, read-ahead %d frames", sampleRate, lead);
 }
@@ -466,6 +490,62 @@ bool PlaybackEngine::writeTakeFlac(const std::string &path) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Mix Preview (#16)
+// ---------------------------------------------------------------------------------------------
+
+void PlaybackEngine::setVocalEffects(VocalEffects effects, int64_t tailFrames) {
+    const int32_t bits = static_cast<int32_t>(effects.reverb) | (effects.compression ? 1 << 2 : 0) |
+                         (effects.highPass ? 1 << 3 : 0);
+    mTakeTail.store(std::max<int64_t>(tailFrames, 0));
+    mEffectsBits.store(bits);
+}
+
+bool PlaybackEngine::beginGuideLoad(int channels, int sampleRate) {
+    std::lock_guard<std::mutex> lock(mControlMutex);
+    if (mTransport.load() == Transport::PlayingTake && mGuideDecoded.load() > 0) enterIdleLocked();
+    freeGuideLocked();
+    if (sampleRate != mSampleRate.load()) {
+        LOGW("Guide Vocal at %d Hz does not match the Backing Audio at %d Hz", sampleRate, mSampleRate.load());
+        return false;
+    }
+    // As long as the Backing Audio may be, so appends never reallocate the table the callback reads.
+    mGuideBlocks.reserve(std::max(mBlocks.capacity(), mBlocks.size()));
+    mGuideChannels = std::max(1, channels);
+    return true;
+}
+
+bool PlaybackEngine::appendGuideLoad(const float *interleaved, int frames) {
+    std::lock_guard<std::mutex> lock(mControlMutex);
+    const int ch = mGuideChannels;
+    if (ch <= 0 || frames <= 0) return ch > 0;
+    int64_t decoded = mGuideDecoded.load();
+    for (int i = 0; i < frames; ++i) {
+        const int64_t block = decoded / kBlockFrames;
+        if (block >= static_cast<int64_t>(mGuideBlocks.size())) {
+            if (mGuideBlocks.size() == mGuideBlocks.capacity()) {
+                mGuideDecoded.store(decoded, std::memory_order_release);
+                return false;
+            }
+            mGuideBlocks.push_back(new float[kBlockFrames * 2]);
+        }
+        float *dst = mGuideBlocks[static_cast<size_t>(block)] + (decoded % kBlockFrames) * 2;
+        const float l = interleaved[i * ch];
+        dst[0] = l;
+        dst[1] = ch > 1 ? interleaved[i * ch + 1] : l;
+        ++decoded;
+    }
+    mGuideDecoded.store(decoded, std::memory_order_release);  // publish after the samples are written
+    return true;
+}
+
+void PlaybackEngine::clearGuide() {
+    std::lock_guard<std::mutex> lock(mControlMutex);
+    if (mTransport.load() == Transport::PlayingTake) enterIdleLocked();
+    mGuideChannels = 0;
+    freeGuideLocked();
+}
+
+// ---------------------------------------------------------------------------------------------
 // Audio callback
 // ---------------------------------------------------------------------------------------------
 
@@ -558,7 +638,13 @@ oboe::DataCallbackResult PlaybackEngine::onAudioReady(oboe::AudioStream *, void 
     // Plain playback follows the Transpose control live; a Take keeps the one it started with.
     const int transpose = transport == Transport::Playing ? mPlayTranspose.load(std::memory_order_relaxed)
                                                           : mTransportTranspose.load(std::memory_order_relaxed);
-    const int32_t written = mBacking.render(mBlockFrames, start, decoded, complete, seek >= 0, transpose, out, numFrames);
+    // A Mix Preview's Guide Vocal joins the Backing Audio before the stretcher (#16).
+    const int64_t guideDecoded = mGuideDecoded.load(std::memory_order_acquire);
+    const float guideLevel = mGuideLevel.load(std::memory_order_relaxed);
+    const bool guided = transport == Transport::PlayingTake && guideDecoded > 0 && guideLevel > 0.0f;
+    if (guided) mGuided.prepare(guideDecoded, guideLevel);
+    const StereoFrames &source = guided ? static_cast<const StereoFrames &>(mGuided) : mBlockFrames;
+    const int32_t written = mBacking.render(source, start, decoded, complete, seek >= 0, transpose, out, numFrames);
     int64_t pos = start + written;
     bool finished = complete && pos >= decoded;
 
@@ -592,10 +678,16 @@ oboe::DataCallbackResult PlaybackEngine::onAudioReady(oboe::AudioStream *, void 
         const int64_t align = mTakeAlignment.load(std::memory_order_relaxed);
         // Review Balance: the Backing Audio plays quieter, so the voice can be judged. A Mix Preview
         // sets its own levels; the Offline Render mixes the same way.
+        // A Mix Preview's Vocal Effects, from a fresh state when the Take starts, like the Offline Render.
+        const int32_t bits = mEffectsBits.load(std::memory_order_relaxed);
+        const VocalEffects effects{static_cast<Reverb>(bits & 3), (bits & (1 << 2)) != 0, (bits & (1 << 3)) != 0};
+        if (seek >= 0) mEffects.reset();
+        if (effects != mEffects.effects()) mEffects.set(effects);
         mixTake(out, numFrames, start, mTakeStart, align, mTake.data(), takeFrames,
-                mReviewBackingGain.load(std::memory_order_relaxed), mTakeGain.load(std::memory_order_relaxed));
+                mReviewBackingGain.load(std::memory_order_relaxed), mTakeGain.load(std::memory_order_relaxed), &mEffects);
         pos = start + numFrames;  // the Take may run on past the decoded Backing Audio
-        if (pos - mTakeStart + align >= takeFrames) finished = true;
+        // With a reverb, it runs on for the tail.
+        if (pos - mTakeStart + align >= takeFrames + mTakeTail.load(std::memory_order_relaxed)) finished = true;
     }
 
     clipOutput(out, numFrames);

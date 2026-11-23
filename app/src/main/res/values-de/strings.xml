@@ -249,4 +249,18 @@
     <string name="backing_export_instrumental_later">Das Instrumental lässt sich exportieren, sobald die Gesangsentfernung fertig ist; das Original schon jetzt.</string>
     <string name="backing_export_saved_as">Wird gespeichert als „%1$s“</string>
     <string name="backing_export_transpose_once">Nur für diesen Export; du singst weiter bei %1$s.</string>
+    <string name="mix_vocal_effects">Gesangseffekte</string>
+    <string name="mix_reverb">Hall</string>
+    <string name="mix_reverb_dry">Trocken</string>
+    <string name="mix_reverb_room">Raum</string>
+    <string name="mix_reverb_hall">Saal</string>
+    <string name="mix_compression">Sanfte Kompression</string>
+    <string name="mix_compression_hint">Gleicht laute und leise Stellen an.</string>
+    <string name="mix_high_pass">Hochpassfilter</string>
+    <string name="mix_high_pass_hint">Entfernt Rumpeln und Griffgeräusche unterhalb der Stimme.</string>
+    <string name="mix_effects_hint">Nur in diesem Mix: Anhören und Mithören bleiben trocken.</string>
+    <string name="mix_guide_vocal">Leitstimme</string>
+    <string name="mix_guide_vocal_hint">Mischt den Originalgesang ins Instrumental, in deiner Tonart. Bei 100 % klingt es wie das Original.</string>
+    <string name="mix_guide_vocal_vocal_free">Dieser Song hat keinen Gesang zum Beimischen.</string>
+    <string name="mix_guide_vocal_original">Das Original enthält den Gesang schon.</string>
 </resources>

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.engine
 
+import eu.schicht8.meavox.core.mix.VocalEffects
+
 /** JNI surface of the native `PlaybackEngine`. Every call takes the handle from [create]. Use [OboeAudioEngine]. */
 internal object NativePlayback {
     init {
@@ -55,4 +57,25 @@ internal object NativePlayback {
     external fun beginTakeLoad(handle: Long, startFrame: Long, sampleRate: Int, estimatedFrames: Long): Boolean
     external fun appendTakeLoad(handle: Long, interleaved: FloatArray, frames: Int, channels: Int)
     external fun writeTakeFlac(handle: Long, path: String): Boolean
+
+    // Mix Preview (#16). [reverb] is [REVERB_DRY], [REVERB_ROOM] or [REVERB_HALL].
+    external fun setVocalEffects(handle: Long, reverb: Int, compression: Boolean, highPass: Boolean, tailFrames: Long)
+    external fun beginGuideLoad(handle: Long, channels: Int, sampleRate: Int): Boolean
+    /** Returns false once the reserved capacity is exhausted: stop decoding. */
+    external fun appendGuideLoad(handle: Long, interleaved: FloatArray, frames: Int): Boolean
+    external fun clearGuide(handle: Long)
+    external fun setGuideLevel(handle: Long, level: Float)
+    external fun guideDecodedFrames(handle: Long): Long
+
+    /** Values of the native `Reverb` enum. */
+    const val REVERB_DRY = 0
+    const val REVERB_ROOM = 1
+    const val REVERB_HALL = 2
+}
+
+/** The reverb preset as the native engine names it. */
+internal fun VocalEffects.Reverb.native(): Int = when (this) {
+    VocalEffects.Reverb.Dry -> NativePlayback.REVERB_DRY
+    VocalEffects.Reverb.Room -> NativePlayback.REVERB_ROOM
+    VocalEffects.Reverb.Hall -> NativePlayback.REVERB_HALL
 }

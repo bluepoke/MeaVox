@@ -94,6 +94,20 @@ public:
     // Writes the held Take as mono 24-bit FLAC. False on I/O or encoder errors.
     bool writeTakeFlac(const std::string &path);
 
+    // --- Mix Preview (#16) ---
+    // Vocal Effects on the held Take while it plays, applied live (none until set). Take playback
+    // runs on [tailFrames] past the Take's end, so a reverb rings out.
+    void setVocalEffects(VocalEffects effects, int64_t tailFrames);
+    // Starts loading the Guide Vocal: a Vocal Stem at the Backing Audio's rate, added to it before
+    // the stretcher while the held Take plays. Drops one held before. False if the rate doesn't match.
+    bool beginGuideLoad(int channels, int sampleRate);
+    // Returns false once the reserved capacity is exhausted (the rest is dropped; stop decoding).
+    bool appendGuideLoad(const float *interleaved, int frames);
+    void clearGuide();
+    // Level of the Guide Vocal against the Backing Audio, 0..1; 0 until set.
+    void setGuideLevel(float level) { mGuideLevel.store(level); }
+    int64_t guideDecodedFrames() const { return mGuideDecoded.load(); }
+
     Transport transport() const { return mTransport.load(); }
     bool isPlaying() const { return mTransport.load() != Transport::Idle; }
     int64_t positionFrames() const { return mPosition.load(); }
@@ -137,10 +151,31 @@ private:
         const std::vector<float *> &mBlocks;
     };
 
+    // The Backing Audio with the Guide Vocal added at a level, as BackingRenderer reads it (#16): summed
+    // before the stretcher, so the Guide Vocal is transposed with it. Callback only, after prepare().
+    class GuidedFrames : public StereoFrames {
+    public:
+        GuidedFrames(const StereoFrames &backing, const StereoFrames &guide);
+        void prepare(int64_t guideDecoded, float level) {
+            mGuideDecoded = guideDecoded;
+            mLevel = level;
+        }
+        const float *at(int64_t frame, int64_t &contiguous) const override;
+
+    private:
+        static constexpr int64_t kScratchFrames = 4096;
+        const StereoFrames &mBacking;
+        const StereoFrames &mGuide;
+        int64_t mGuideDecoded = 0;
+        float mLevel = 0.0f;
+        mutable std::vector<float> mScratch;  // one sum at a time: BackingRenderer copies before its next at()
+    };
+
     bool startStreamLocked();
     bool openSessionStreamsLocked();
     void closeStreamLocked();
     void freeBlocksLocked();
+    void freeGuideLocked();
     void enterIdleLocked();
     bool startTransportLocked(int64_t fromFrame, Transport transport, int transpose);
     void configureStretchLocked(int32_t sampleRate);
@@ -199,6 +234,19 @@ private:
     int mDeficitCallbacks = 0;
     int64_t mTakeLatency = 0;
     std::atomic<int64_t> mTakeAlignment{0};
+
+    // Mix Preview (#16). The chain is the callback's, configured while the stream is closed; it is
+    // reset when Take playback starts and follows mEffectsBits (reverb | compression << 2 | high-pass << 3).
+    VocalChain mEffects;
+    std::atomic<int32_t> mEffectsBits{0};
+    std::atomic<int64_t> mTakeTail{0};
+    // Guide Vocal blocks, like mBlocks; read by the callback only while the Take plays and below mGuideDecoded.
+    std::vector<float *> mGuideBlocks;
+    std::atomic<int64_t> mGuideDecoded{0};
+    int32_t mGuideChannels = 0;  // > 0 while a Guide Vocal load is in progress
+    std::atomic<float> mGuideLevel{0.0f};
+    BlockFrames mGuideBlockFrames{mGuideBlocks};
+    GuidedFrames mGuided{mBlockFrames, mGuideBlockFrames};
 
     // Xrun correction while recording (audio thread, ADR 13): an output underrun delays the
     // output without delaying the microphone, so the input backlog grows by the frames lost.

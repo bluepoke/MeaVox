@@ -27,10 +27,7 @@ data class Mix(
 @JvmInline
 value class MixId(val value: String)
 
-/**
- * Levels and alignment of a Mix (GLOSSARY: Mix Settings). The Guide Vocal level and Vocal Effects
- * come with #16.
- */
+/** Levels, alignment and effects of a Mix (GLOSSARY: Mix Settings). */
 data class MixSettings(
     /** Level of the Backing Audio in dB, [MIN_BACKING_DB]..0. */
     val backingDb: Float,
@@ -38,11 +35,21 @@ data class MixSettings(
     val vocalDb: Float = 0f,
     /** Vocal Nudge: the Take sounds this much later (negative: earlier), on top of Latency Calibration. */
     val vocalNudgeMs: Int = 0,
+    /** The Vocal Effects on the Take (#16); none by default. */
+    val effects: VocalEffects = VocalEffects.None,
+    /**
+     * How much of the Guide Vocal (the Vocal Stem) is blended into the Instrumental, 0..1 (#16): 0 is
+     * none, 1 the vocals as loud as Separation found them, so the Instrumental sounds like the
+     * Original Audio. It is part of the Backing Audio: transposed with it, and its level follows
+     * [backingDb]. Only over an Instrumental ([guideVocalUnavailable]).
+     */
+    val guideVocalLevel: Float = 0f,
 ) {
     init {
         require(backingDb in MIN_BACKING_DB..0f) { "backing level $backingDb dB is outside $MIN_BACKING_DB..0" }
         require(vocalDb in MIN_VOCAL_DB..MAX_VOCAL_DB) { "vocal level $vocalDb dB is outside $MIN_VOCAL_DB..$MAX_VOCAL_DB" }
         require(vocalNudgeMs in -MAX_NUDGE_MS..MAX_NUDGE_MS) { "Vocal Nudge $vocalNudgeMs ms is outside ±$MAX_NUDGE_MS" }
+        require(guideVocalLevel in 0f..1f) { "Guide Vocal level $guideVocalLevel is outside 0..1" }
     }
 
     companion object {
@@ -52,10 +59,18 @@ data class MixSettings(
         const val MAX_NUDGE_MS = 200
 
         /** Mix Settings with each value moved into its range. */
-        fun clamped(backingDb: Float, vocalDb: Float, vocalNudgeMs: Int) = MixSettings(
+        fun clamped(
+            backingDb: Float,
+            vocalDb: Float,
+            vocalNudgeMs: Int,
+            effects: VocalEffects = VocalEffects.None,
+            guideVocalLevel: Float = 0f,
+        ) = MixSettings(
             backingDb.coerceIn(MIN_BACKING_DB, 0f),
             vocalDb.coerceIn(MIN_VOCAL_DB, MAX_VOCAL_DB),
             vocalNudgeMs.coerceIn(-MAX_NUDGE_MS, MAX_NUDGE_MS),
+            effects,
+            guideVocalLevel.coerceIn(0f, 1f),
         )
     }
 }

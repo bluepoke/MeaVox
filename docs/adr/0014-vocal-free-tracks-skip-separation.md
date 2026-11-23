@@ -23,7 +23,7 @@ Some Original Audio has no lead vocal to remove, for example the audio of a kara
 - Marking, and every state a Separation job writes, are **atomic changes of the Track**. A job that hasn't stopped yet when the Track is marked can't write `Separating` or `Ready` over it.
 - Deleted stems (ADR 17) don't come back for a Vocal-Free Track: marking a `Stems Deleted` Track makes it `Ready` at once.
 - Mixes (#14), the Backing Audio choice (#17) and the Guide Vocal (#18) don't exist yet. Their parts of this decision land with those tickets.
-- Since #14, marking a Track switches its Mixes on the Instrumental to the Original Audio; unmarking leaves them there, and the Mix Editor can switch each back once the Track has an Instrumental. The editor hides the Backing Audio choice on a Vocal-Free Track. The Guide Vocal level in the Mix, and disabling it there, come with #16.
+- Since #14, marking a Track switches its Mixes on the Instrumental to the Original Audio; unmarking leaves them there, and the Mix Editor can switch each back once the Track has an Instrumental. The editor hides the Backing Audio choice on a Vocal-Free Track. Since #16 the Mix Editor disables the Guide Vocal level on a Vocal-Free Track, with the reason that it has no vocals to blend in (ADR 7, note on #16).
 - Since ADR 20 (#34), Track detail and the Session are one screen per Track: the toggle and the snackbar are there, and the Backing Audio choice, built in #34, is hidden on a Vocal-Free Track.
 
 ## Note: one import sheet (#17, 2026-11-18)

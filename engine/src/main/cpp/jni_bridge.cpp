@@ -113,6 +113,27 @@ JNI_FN(jboolean, playTake)(JNIEnv *, jobject, jlong h, jlong alignmentFrames, ji
 
 JNI_FN(void, clearTake)(JNIEnv *, jobject, jlong h) { engine(h).clearTake(); }
 
+JNI_FN(void, setVocalEffects)(JNIEnv *, jobject, jlong h, jint reverb, jboolean compression, jboolean highPass,
+                              jlong tailFrames) {
+    engine(h).setVocalEffects({static_cast<meavox::Reverb>(reverb), compression == JNI_TRUE, highPass == JNI_TRUE}, tailFrames);
+}
+
+JNI_FN(jboolean, beginGuideLoad)(JNIEnv *, jobject, jlong h, jint channels, jint sampleRate) {
+    return engine(h).beginGuideLoad(channels, sampleRate) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNI_FN(jboolean, appendGuideLoad)(JNIEnv *env, jobject, jlong h, jfloatArray data, jint frames) {
+    bool fits = false;
+    withSamples(env, data, [&](const jfloat *samples) { fits = engine(h).appendGuideLoad(samples, frames); });
+    return fits ? JNI_TRUE : JNI_FALSE;
+}
+
+JNI_FN(void, clearGuide)(JNIEnv *, jobject, jlong h) { engine(h).clearGuide(); }
+
+JNI_FN(void, setGuideLevel)(JNIEnv *, jobject, jlong h, jfloat level) { engine(h).setGuideLevel(level); }
+
+JNI_FN(jlong, guideDecodedFrames)(JNIEnv *, jobject, jlong h) { return engine(h).guideDecodedFrames(); }
+
 JNI_FN(jboolean, beginTakeLoad)(JNIEnv *, jobject, jlong h, jlong startFrame, jint sampleRate, jlong estimatedFrames) {
     return engine(h).beginTakeLoad(startFrame, sampleRate, estimatedFrames) ? JNI_TRUE : JNI_FALSE;
 }

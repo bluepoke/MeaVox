@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.core.port
 
+import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.InputDevice
 import eu.schicht8.meavox.core.model.OutputRoute
@@ -118,6 +119,26 @@ interface AudioEngine {
 
     /** Drops the held Take audio, stopping its playback. */
     fun clearTake()
+
+    /**
+     * Vocal Effects on the held Take audio while it plays ([playTake]), applied live; none until set.
+     * The Mix Preview sets its Mix's (#16); Review plays the Take as recorded. With a reverb, Take
+     * playback runs on for its tail ([VocalEffects.Reverb.tailMs]) after the Take ends.
+     */
+    fun setVocalEffects(effects: VocalEffects)
+
+    /**
+     * Blends [file], a Vocal Stem sample-aligned with the loaded Instrumental, into the Backing Audio
+     * as the Guide Vocal, before it is transposed, at the level [setGuideVocalLevel] sets. Returns
+     * once it is decoded past [fromFrame], or false if it can't be read or its rate doesn't match.
+     */
+    suspend fun loadGuideVocal(file: AudioFile, fromFrame: Long): Boolean
+
+    /** Level of the Guide Vocal against the Backing Audio, 0..1 (see [eu.schicht8.meavox.core.mix.MixSettings.guideVocalLevel]); 0 until set. */
+    fun setGuideVocalLevel(level: Float)
+
+    /** Drops the Guide Vocal. */
+    fun clearGuideVocal()
 }
 
 /** Identifies one [AudioEngine.load] call, so an old owner can't unload a newer load. */

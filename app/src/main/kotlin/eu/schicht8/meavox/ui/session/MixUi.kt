@@ -42,9 +42,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import eu.schicht8.meavox.R
+import eu.schicht8.meavox.core.mix.GuideVocalUnavailable
 import eu.schicht8.meavox.core.mix.Mix
 import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.MixSettings
+import eu.schicht8.meavox.core.mix.VocalEffects
+import eu.schicht8.meavox.core.mix.guideVocalUnavailable
 import eu.schicht8.meavox.core.model.BackingChoice
 import eu.schicht8.meavox.core.model.Take
 import eu.schicht8.meavox.core.model.Track
@@ -56,8 +59,8 @@ import eu.schicht8.meavox.ui.formatTime
 import eu.schicht8.meavox.ui.percent
 import eu.schicht8.meavox.ui.resolve
 import eu.schicht8.meavox.ui.theme.MeaVoxButtonShape
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /** The Track's Mixes (#14): one per kept Take to start with, more from a Take's "New Mix". */
 @Composable
@@ -130,8 +133,9 @@ internal data class MixEditorActions(
 )
 
 /**
- * The Mix Editor (#14): Backing Audio, levels and Vocal Nudge, a preview that sounds as the Export
- * will, and the WAV Export with progress, Cancel and the share sheet. The Take is never changed.
+ * The Mix Editor (#14, #16): Backing Audio, levels, Vocal Nudge, Vocal Effects and the Guide Vocal, a
+ * preview that sounds as the Export will, and the Export with progress, Cancel and the share sheet.
+ * The Take is never changed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,6 +174,10 @@ internal fun MixEditorSheet(
                 actions.onSettings(settings.copy(vocalDb = it))
             }
             NudgeControl(settings.vocalNudgeMs) { actions.onSettings(settings.copy(vocalNudgeMs = it)) }
+            VocalEffectsControl(settings.effects) { actions.onSettings(settings.copy(effects = it)) }
+            GuideVocalControl(settings.guideVocalLevel, track.guideVocalUnavailable(mix.backing)) {
+                actions.onSettings(settings.copy(guideVocalLevel = it))
+            }
             // Stored once they stop changing; previewing or exporting stores them too.
             StoreWhenSettled(settings, actions.onSettingsDone)
             val previewing = state is SessionState.PreviewingMix && state.mix.id == mix.id
@@ -234,6 +242,81 @@ private fun LevelSlider(label: String, db: Float, range: ClosedFloatingPointRang
             valueRange = range,
             colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer),
             modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** The Vocal Effects (#16): a reverb preset, gentle compression and a high-pass filter, for this Mix only. */
+@Composable
+private fun VocalEffectsControl(effects: VocalEffects, onChange: (VocalEffects) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(stringResource(R.string.mix_vocal_effects), style = rowLabel())
+        Text(
+            stringResource(R.string.mix_effects_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(stringResource(R.string.mix_reverb), style = MaterialTheme.typography.labelLarge)
+        val reverbs = VocalEffects.Reverb.entries
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            reverbs.forEachIndexed { index, reverb ->
+                Choice(stringResource(reverb.label()), effects.reverb == reverb, index = index, count = reverbs.size) {
+                    onChange(effects.copy(reverb = reverb))
+                }
+            }
+        }
+        SettingRow(stringResource(R.string.mix_compression), effects.compression) { onChange(effects.copy(compression = it)) }
+        Text(
+            stringResource(R.string.mix_compression_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SettingRow(stringResource(R.string.mix_high_pass), effects.highPass) { onChange(effects.copy(highPass = it)) }
+        Text(
+            stringResource(R.string.mix_high_pass_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun VocalEffects.Reverb.label(): Int = when (this) {
+    VocalEffects.Reverb.Dry -> R.string.mix_reverb_dry
+    VocalEffects.Reverb.Room -> R.string.mix_reverb_room
+    VocalEffects.Reverb.Hall -> R.string.mix_reverb_hall
+}
+
+/**
+ * The Guide Vocal level (#16), 0 to 100 % of the original vocals, in 5 % steps; disabled with a short
+ * reason where the Mix can't have one: on a Vocal-Free Track, or over the Original Audio.
+ */
+@Composable
+private fun GuideVocalControl(level: Float, unavailable: GuideVocalUnavailable?, onChange: (Float) -> Unit) {
+    val resources = LocalResources.current
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(stringResource(R.string.mix_guide_vocal), style = rowLabel())
+            if (unavailable == null) {
+                Text(percent(resources, level), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Slider(
+            value = if (unavailable == null) level else 0f,
+            onValueChange = { onChange(((it * 20).roundToInt() / 20f).coerceIn(0f, 1f)) },
+            enabled = unavailable == null,
+            colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            stringResource(
+                when (unavailable) {
+                    null -> R.string.mix_guide_vocal_hint
+                    GuideVocalUnavailable.VocalFree -> R.string.mix_guide_vocal_vocal_free
+                    GuideVocalUnavailable.OverOriginalAudio -> R.string.mix_guide_vocal_original
+                },
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

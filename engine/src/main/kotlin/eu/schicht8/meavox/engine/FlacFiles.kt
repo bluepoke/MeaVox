@@ -55,24 +55,44 @@ object FlacFiles {
         return Writer(file, handle, channels)
     }
 
-    /** Reads [file] into [sink]. Blocking; interrupting the thread cancels it. */
-    fun read(file: File, sink: Sink) {
+    /** One file being read, block by block, at the pace of its caller. */
+    class Reader internal constructor(private val file: File, private var handle: Long, val channels: Int, val sampleRate: Int) :
+        AutoCloseable {
+        /** Reads up to [maxFrames] interleaved frames into [out]; returns how many, 0 at the end. */
+        fun read(out: FloatArray, maxFrames: Int): Int {
+            check(handle != 0L) { "closed" }
+            require(out.size >= maxFrames * channels) { "$maxFrames frames don't fit ${out.size} samples" }
+            val frames = read(handle, out, maxFrames)
+            if (frames < 0) throw IOException("$file is damaged")
+            return frames
+        }
+
+        override fun close() {
+            if (handle == 0L) return
+            closeReader(handle)
+            handle = 0
+        }
+    }
+
+    /** Opens [file] for reading. */
+    fun reader(file: File): Reader {
         val info = IntArray(2)
         val handle = openReader(file.path, info)
         if (handle == 0L) throw IOException("could not read $file as FLAC")
-        try {
-            val channels = info[0]
-            sink.begin(channels, info[1])
-            val block = FloatArray(BLOCK_FRAMES * channels)
+        return Reader(file, handle, info[0], info[1])
+    }
+
+    /** Reads [file] into [sink]. Blocking; interrupting the thread cancels it. */
+    fun read(file: File, sink: Sink) {
+        reader(file).use { reader ->
+            sink.begin(reader.channels, reader.sampleRate)
+            val block = FloatArray(BLOCK_FRAMES * reader.channels)
             while (true) {
                 if (Thread.interrupted()) throw InterruptedException("reading $file cancelled")
-                val frames = read(handle, block, BLOCK_FRAMES)
-                if (frames < 0) throw IOException("$file is damaged")
+                val frames = reader.read(block, BLOCK_FRAMES)
                 if (frames == 0) break
                 sink.write(block, frames)
             }
-        } finally {
-            closeReader(handle)
         }
     }
 

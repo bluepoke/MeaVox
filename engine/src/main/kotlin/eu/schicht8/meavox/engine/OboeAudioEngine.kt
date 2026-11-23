@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.AudioManager
 import android.os.SystemClock
 import android.util.Log
+import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.InputDevice
 import eu.schicht8.meavox.core.model.OutputRoute
@@ -74,6 +75,11 @@ class OboeAudioEngine(context: Context) : AudioEngine {
     private val inputDevices = mutableMapOf<Int, InputDevice>()
 
     override suspend fun load(audio: AudioFile, onProgress: (Float) -> Unit): LoadId {
+        // A Guide Vocal belongs to the Backing Audio it was loaded for.
+        withContext(control) {
+            guideJob?.cancelAndJoin()
+            guideJob = null
+        }
         val playable = CompletableDeferred<Unit>()
         val job: Job
         val id: LoadId
@@ -338,6 +344,64 @@ class OboeAudioEngine(context: Context) : AudioEngine {
         }
     }
 
+    // --- Mix Preview (#16) ---
+
+    /** Decoding of the Guide Vocal; confined to [control]. */
+    private var guideJob: Job? = null
+
+    override fun setVocalEffects(effects: VocalEffects) {
+        scope.launch {
+            val tail = effects.tailFrames(NativePlayback.sampleRate(handle))
+            NativePlayback.setVocalEffects(handle, effects.reverb.native(), effects.compression, effects.highPass, tail)
+        }
+    }
+
+    override suspend fun loadGuideVocal(file: AudioFile, fromFrame: Long): Boolean {
+        val ready = CompletableDeferred<Boolean>()
+        // On [control], so it runs after a clearGuideVocal() called before it.
+        withContext(control) {
+            guideJob?.cancelAndJoin()
+            guideJob = scope.launch(Dispatchers.IO) {
+                try {
+                    // The stems are FLAC; read exactly as the Offline Render reads them.
+                    FlacFiles.reader(File(file.path)).use { reader ->
+                        if (!NativePlayback.beginGuideLoad(handle, reader.channels, reader.sampleRate)) {
+                            ready.complete(false)
+                            return@launch
+                        }
+                        val wanted = fromFrame + reader.sampleRate.toLong() * START_BUFFER_MS / 1000
+                        val block = FloatArray(GUIDE_BLOCK_FRAMES * reader.channels)
+                        while (isActive) {
+                            val n = reader.read(block, GUIDE_BLOCK_FRAMES)
+                            if (n == 0 || !NativePlayback.appendGuideLoad(handle, block, n)) break
+                            if (!ready.isCompleted && NativePlayback.guideDecodedFrames(handle) >= wanted) ready.complete(true)
+                        }
+                    }
+                    ready.complete(true)
+                } catch (e: CancellationException) {
+                    ready.complete(false)
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "could not load the Guide Vocal ${file.path}", e)
+                    ready.complete(false)
+                }
+            }
+        }
+        return ready.await()
+    }
+
+    override fun setGuideVocalLevel(level: Float) {
+        scope.launch { NativePlayback.setGuideLevel(handle, level.coerceIn(0f, 1f)) }
+    }
+
+    override fun clearGuideVocal() {
+        scope.launch {
+            guideJob?.cancelAndJoin()
+            guideJob = null
+            NativePlayback.clearGuide(handle)
+        }
+    }
+
     // --- Publishing ---
 
     private fun startTicker() {
@@ -402,6 +466,7 @@ class OboeAudioEngine(context: Context) : AudioEngine {
         const val POSITION_INTERVAL_MS = 50L
         const val START_BUFFER_MS = 2_000L
         const val CLIP_HOLD_MS = 1_500L
+        const val GUIDE_BLOCK_FRAMES = 8192
         const val TAG = "MeaVoxEngine"
     }
 }

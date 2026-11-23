@@ -142,7 +142,18 @@ int32_t BackingRenderer::render(const StereoFrames &source, int64_t pos, int64_t
 }
 
 void mixTake(float *out, int32_t numFrames, int64_t firstFrame, int64_t takeStart, int64_t alignment, const float *take,
-             int64_t takeFrames, float backingGain, float takeGain) {
+             int64_t takeFrames, float backingGain, float takeGain, VocalChain *effects) {
+    if (effects && effects->effects().any()) {
+        for (int32_t i = 0; i < numFrames; ++i) {
+            const int64_t j = firstFrame + i - takeStart + alignment;
+            float left = 0.0f;
+            float right = 0.0f;
+            effects->process((j >= 0 && j < takeFrames) ? take[j] : 0.0f, left, right);
+            out[2 * i] = out[2 * i] * backingGain + left * takeGain;
+            out[2 * i + 1] = out[2 * i + 1] * backingGain + right * takeGain;
+        }
+        return;
+    }
     for (int32_t i = 0; i < numFrames; ++i) {
         const int64_t j = firstFrame + i - takeStart + alignment;
         const float v = (j >= 0 && j < takeFrames) ? take[j] * takeGain : 0.0f;

@@ -10,7 +10,10 @@ internal object NativeMixRender {
     /** As `to`: render until the Backing Audio ends (the native `kUntilEnd`). */
     const val UNTIL_END = Long.MAX_VALUE
 
-    /** Gains are linear; Take sample j sounds at timeline frame takeStart + j − alignment. */
+    /**
+     * Gains are linear; Take sample j sounds at timeline frame takeStart + j − alignment, through the
+     * Vocal Effects ([reverb] as in [NativePlayback.REVERB_DRY]). [guideLevel] is the Guide Vocal's, 0..1.
+     */
     external fun create(
         sampleRate: Int,
         from: Long,
@@ -20,7 +23,13 @@ internal object NativeMixRender {
         transpose: Int,
         backingGain: Float,
         takeGain: Float,
+        reverb: Int,
+        compression: Boolean,
+        highPass: Boolean,
+        guideLevel: Float,
     ): Long
+    /** Guide Vocal frames, fed before the Backing Audio frames of the same index. */
+    external fun appendGuide(handle: Long, interleaved: FloatArray, frames: Int, channels: Int)
     external fun appendTake(handle: Long, interleaved: FloatArray, frames: Int, channels: Int)
     external fun appendBacking(handle: Long, interleaved: FloatArray, frames: Int, channels: Int)
     external fun endBacking(handle: Long)

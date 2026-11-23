@@ -947,7 +947,7 @@ private fun LevelMeter(level: Float, clipping: Boolean) {
 }
 
 @Composable
-private fun SettingRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SettingRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(label, Modifier.weight(1f), style = rowLabel())
         Switch(checked = checked, onCheckedChange = onChange)

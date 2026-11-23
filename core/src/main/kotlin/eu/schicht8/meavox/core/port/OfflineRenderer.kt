@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.core.port
 
+import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.Transpose
 
@@ -34,8 +35,9 @@ interface OfflineRenderer {
 
 /**
  * One Offline Render of a Mix. Frames are on the Session timeline at [sampleRate]. Take sample i
- * sounds at timeline frame [takeStartFrame] + i − [alignmentFrames], as in [AudioEngine.playTake].
- * The Backing Audio plays at [transpose] (ADR 5).
+ * sounds at timeline frame [takeStartFrame] + i − [alignmentFrames], as in [AudioEngine.playTake],
+ * through [effects]. The Backing Audio plays at [transpose] (ADR 5), with [guideVocal] (a Vocal Stem)
+ * blended in at [guideVocalLevel] before it is transposed, so the Guide Vocal is in the same key.
  */
 data class MixRender(
     val backing: AudioFile,
@@ -48,6 +50,9 @@ data class MixRender(
     val takeGainDb: Float,
     val fromFrame: Long,
     val toFrame: Long,
+    val effects: VocalEffects = VocalEffects.None,
+    val guideVocal: AudioFile? = null,
+    val guideVocalLevel: Float = 0f,
 ) {
     val frames: Long get() = toFrame - fromFrame
 }

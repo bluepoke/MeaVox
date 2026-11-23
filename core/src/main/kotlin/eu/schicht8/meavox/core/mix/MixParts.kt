@@ -18,11 +18,22 @@ internal data class MixParts(val mix: Mix, val track: Track, val take: Take, val
     /** Frames the Take is moved earlier (Latency Calibration offset minus the Vocal Nudge). */
     fun alignmentFrames(settings: MixSettings = mix.settings): Long = take.alignmentFrames(settings)
 
-    /** The Offline Render of the Mix: the span Review plays, from the Start Position until the Take ends. */
+    /** The Vocal Stem blended in as the Guide Vocal, if the Mix can have one and wants it. */
+    fun guideVocal(files: TrackFiles, settings: MixSettings = mix.settings): AudioFile? {
+        val instrumental = backing as? BackingAudio.Instrumental ?: return null
+        if (settings.guideVocalLevel <= 0f || track.guideVocalUnavailable(backing) != null) return null
+        return files.stems(track.id, instrumental.model).vocalStem
+    }
+
+    /**
+     * The Offline Render of the Mix: the span Review plays, from the Start Position until the Take
+     * ends, and on for the reverb's tail.
+     */
     fun render(files: TrackFiles): MixRender {
         val settings = mix.settings
         val alignment = alignmentFrames(settings)
         val from = take.startFrame
+        val guideVocal = guideVocal(files)
         return MixRender(
             backing = files.fileOf(track.id, backing),
             take = files.take(track.id, take.id),
@@ -33,7 +44,10 @@ internal data class MixParts(val mix: Mix, val track: Track, val take: Take, val
             backingGainDb = settings.backingDb,
             takeGainDb = settings.vocalDb,
             fromFrame = from,
-            toFrame = maxOf(from, take.startFrame + take.frames - alignment),
+            toFrame = maxOf(from, take.startFrame + take.frames - alignment) + settings.effects.tailFrames(take.sampleRate),
+            effects = settings.effects,
+            guideVocal = guideVocal,
+            guideVocalLevel = if (guideVocal != null) settings.guideVocalLevel else 0f,
         )
     }
 }

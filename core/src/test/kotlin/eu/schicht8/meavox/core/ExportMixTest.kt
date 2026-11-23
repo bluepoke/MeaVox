@@ -7,6 +7,7 @@ import eu.schicht8.meavox.core.mix.Mix
 import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.MixSettings
 import eu.schicht8.meavox.core.mix.MixUnavailable
+import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -143,6 +144,45 @@ class ExportMixTest {
         export.export(mix.id, ExportFormat.Wav())
 
         assertEquals(ExportTags("Fly Me (Mix 1)", artist = "Sinatra feat. Peter"), store.exports.single().tags)
+    }
+
+    @Test
+    fun `the Offline Render applies the Mix's Vocal Effects and runs on for the reverb's tail`() = runTest {
+        val effects = VocalEffects(reverb = VocalEffects.Reverb.Hall, compression = true, highPass = true)
+        val mix = arrange(TrackPipelineState.Ready(FAST), BackingAudio.Instrumental(FAST), MixSettings(backingDb = -12f, effects = effects))
+
+        export.export(mix.id, ExportFormat.Wav())
+
+        val render = renderer.renders.single()
+        assertEquals(effects, render.effects)
+        // The Take ends at 1 440 000 + 480 000 − 4 800 (no Nudge); the Hall rings on for 2.5 s at 48 kHz.
+        assertEquals(1_915_200 + 120_000, render.toFrame)
+        assertEquals(render.frames, store.exports.single().framesWritten)
+    }
+
+    @Test
+    fun `the Guide Vocal is the Vocal Stem of the Mix's Instrumental, at the Mix's level`() = runTest {
+        val mix = arrange(TrackPipelineState.Ready(FAST), BackingAudio.Instrumental(FAST), MixSettings(backingDb = -12f, guideVocalLevel = 0.3f))
+
+        export.export(mix.id, ExportFormat.Wav())
+
+        val render = renderer.renders.single()
+        assertEquals(files.stems(trackId, FAST).vocalStem, render.guideVocal)
+        assertEquals(0.3f, render.guideVocalLevel)
+    }
+
+    @Test
+    fun `there is no Guide Vocal over the Original Audio, nor on a Vocal-Free Track`() = runTest {
+        val overOriginal = arrange(TrackPipelineState.Ready(FAST), BackingAudio.OriginalAudio, MixSettings(backingDb = -12f, guideVocalLevel = 0.3f))
+        export.export(overOriginal.id, ExportFormat.Wav())
+        // Marked Vocal-Free, with an earlier Instrumental's stems still stored.
+        tracks.update(trackId) { it.copy(vocalFree = true, pipeline = TrackPipelineState.Ready(null)) }
+        files.store(files.stems(trackId, FAST).instrumental, 30_000_000)
+        mixes.update(overOriginal.copy(backing = BackingAudio.Instrumental(FAST)))
+        export.export(overOriginal.id, ExportFormat.Wav())
+
+        assertEquals(listOf(null, null), renderer.renders.map { it.guideVocal })
+        assertEquals(listOf(0f, 0f), renderer.renders.map { it.guideVocalLevel })
     }
 
     @Test

@@ -5,8 +5,10 @@ import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.library.TrackRepository
 import eu.schicht8.meavox.core.mix.Mix
 import eu.schicht8.meavox.core.mix.MixId
+import eu.schicht8.meavox.core.mix.MixParts
 import eu.schicht8.meavox.core.mix.MixSettings
 import eu.schicht8.meavox.core.mix.Mixes
+import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.mix.alignmentFrames
 import eu.schicht8.meavox.core.mix.fileOf
 import eu.schicht8.meavox.core.model.AudioFile
@@ -349,7 +351,8 @@ class Session private constructor(
             return@withLock false
         }
         _state.value = SessionState.PreviewingMix(parts.mix, parts.take, parts.mix.settings)
-        applyMixLevels(parts.mix.settings)
+        previewParts = parts
+        applyMixSettings(parts, parts.mix.settings)
         if (!engine.playTake(parts.alignmentFrames(), parts.take.transpose)) {
             endPreviewLocked()
             return@withLock false
@@ -364,13 +367,28 @@ class Session private constructor(
     suspend fun setPreviewSettings(settings: MixSettings) = mutex.withLock {
         val preview = _state.value as? SessionState.PreviewingMix ?: return@withLock
         _state.value = preview.copy(settings = settings)
-        applyMixLevels(settings)
+        previewParts?.let { applyMixSettings(it, settings) }
         engine.setTakeAlignment(preview.take.alignmentFrames(settings))
     }
 
-    private fun applyMixLevels(settings: MixSettings) {
+    /** The Mix being previewed, as resolved when the preview started. */
+    private var previewParts: MixParts? = null
+
+    /** The Guide Vocal the engine holds for the preview, if any. */
+    private var guideVocal: AudioFile? = null
+
+    /** The Mix's levels, Vocal Effects and Guide Vocal, heard at once; the Vocal Stem is loaded the first time it is wanted. */
+    private suspend fun applyMixSettings(parts: MixParts, settings: MixSettings) {
         engine.setReviewBackingGain(settings.backingDb)
         engine.setTakeGain(settings.vocalDb)
+        engine.setVocalEffects(settings.effects)
+        val wanted = parts.guideVocal(deps.files, settings)
+        if (wanted != null && wanted != guideVocal) {
+            // Decoded far enough to play from where the preview is now (its start, or later when raised during it).
+            val at = maxOf(parts.take.startFrame, engine.playback.value.positionMs * parts.take.sampleRate / 1000)
+            if (engine.loadGuideVocal(wanted, at)) guideVocal = wanted
+        }
+        engine.setGuideVocalLevel(if (wanted != null && wanted == guideVocal) settings.guideVocalLevel else 0f)
     }
 
     /** Back to free playback at the Take's Start Position, with the Review Balance and the Session's own Backing Audio. */
@@ -379,8 +397,18 @@ class Session private constructor(
         engine.clearTake()
         engine.setReviewBackingGain(_reviewBackingDb.value)
         engine.setTakeGain(0f)
+        resetMixEffects()
         engine.seekTo(preview.take.startPositionMs)
         becomeIdleLocked(preview.take.startPositionMs)
+    }
+
+    /** Takes play as recorded again: no Vocal Effects, no Guide Vocal. */
+    private fun resetMixEffects() {
+        engine.setVocalEffects(VocalEffects.None)
+        engine.setGuideVocalLevel(0f)
+        engine.clearGuideVocal()
+        guideVocal = null
+        previewParts = null
     }
 
     private val closed = AtomicBoolean(false)
@@ -488,8 +516,9 @@ class Session private constructor(
         _countdownEnabled.value = deps.settings.countdownEnabled()
         _reviewBackingDb.value = deps.settings.reviewBackingDb() ?: DEFAULT_REVIEW_BACKING_DB
         engine.setReviewBackingGain(_reviewBackingDb.value)
-        // A Session left during a Mix Preview may have left its vocal level behind.
+        // A Session left during a Mix Preview may have left its vocal level and effects behind.
         engine.setTakeGain(0f)
+        resetMixEffects()
         engine.beginSession()
         engine.setTranspose(_transpose.value)
         loadBacking(track.backingAudio(), onProgress)

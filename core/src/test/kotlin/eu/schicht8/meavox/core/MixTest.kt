@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.core
 
+import eu.schicht8.meavox.core.mix.GuideVocalUnavailable
 import eu.schicht8.meavox.core.mix.MixSettings
 import eu.schicht8.meavox.core.mix.Mixes
+import eu.schicht8.meavox.core.mix.VocalEffects
+import eu.schicht8.meavox.core.mix.guideVocalUnavailable
 import eu.schicht8.meavox.core.model.BackingChoice
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -225,6 +228,93 @@ class MixTest {
 
         assertEquals(0f, engine.takeGainDb)
         assertEquals(Session.DEFAULT_REVIEW_BACKING_DB, engine.reviewBackingGainDb)
+    }
+
+    @Test
+    fun `a new Mix has no Vocal Effects and no Guide Vocal, and editing them stores them`() = runTest {
+        val session = openReady()
+        keepTake(session, fromMs = 30_000, lengthMs = 10_000)
+        val mix = mixes.observe(trackId).first().single()
+        val edited = mix.settings.copy(effects = VocalEffects(VocalEffects.Reverb.Room, compression = true), guideVocalLevel = 0.25f)
+
+        assertEquals(VocalEffects.None, mix.settings.effects)
+        assertEquals(0f, mix.settings.guideVocalLevel)
+        mixes.updateSettings(mix.id, edited)
+
+        assertEquals(edited, mixes.observe(trackId).first().single().settings)
+    }
+
+    @Test
+    fun `the Guide Vocal can't be set on a Vocal-Free Track, nor over the Original Audio`() = runTest {
+        addTrack(TrackPipelineState.Ready(FAST))
+        val track = checkNotNull(tracks.get(trackId))
+
+        assertNull(track.guideVocalUnavailable(BackingAudio.Instrumental(FAST)))
+        assertEquals(GuideVocalUnavailable.OverOriginalAudio, track.guideVocalUnavailable(BackingAudio.OriginalAudio))
+        assertEquals(GuideVocalUnavailable.VocalFree, track.copy(vocalFree = true).guideVocalUnavailable(BackingAudio.OriginalAudio))
+    }
+
+    @Test
+    fun `previewing a Mix plays its Vocal Effects and its Guide Vocal`() = runTest {
+        val session = openReady()
+        keepTake(session, fromMs = 30_000, lengthMs = 10_000)
+        val mix = mixes.observe(trackId).first().single()
+        val effects = VocalEffects(VocalEffects.Reverb.Hall, compression = true, highPass = true)
+        mixes.updateSettings(mix.id, mix.settings.copy(effects = effects, guideVocalLevel = 0.4f))
+
+        session.previewMix(mix.id)
+
+        assertEquals(effects, engine.vocalEffects)
+        assertEquals(files.stems(trackId, FAST).vocalStem, engine.guideVocal)
+        assertEquals(0.4f, engine.guideVocalLevel)
+    }
+
+    @Test
+    fun `the preview runs on for the reverb's tail`() = runTest {
+        val session = openReady()
+        val take = keepTake(session, fromMs = 30_000, lengthMs = 10_000)
+        val mix = mixes.observe(trackId).first().single()
+        mixes.updateSettings(mix.id, mix.settings.copy(effects = VocalEffects(VocalEffects.Reverb.Hall)))
+        session.previewMix(mix.id)
+
+        engine.advance(take.durationMs)
+        runCurrent()
+        assertIs<SessionState.PreviewingMix>(session.state.value)
+        engine.advance(VocalEffects.Reverb.Hall.tailMs.toLong())
+        runCurrent()
+
+        assertEquals(SessionState.Idle, session.state.value)
+    }
+
+    @Test
+    fun `raising the Guide Vocal during the preview brings it in, and Takes play dry without it afterwards`() = runTest {
+        val session = openReady()
+        keepTake(session, fromMs = 30_000, lengthMs = 10_000)
+        val mix = mixes.observe(trackId).first().single()
+        session.previewMix(mix.id)
+        assertNull(engine.guideVocal)
+
+        session.setPreviewSettings(mix.settings.copy(effects = VocalEffects(VocalEffects.Reverb.Room), guideVocalLevel = 0.5f))
+        assertEquals(files.stems(trackId, FAST).vocalStem, engine.guideVocal)
+        assertEquals(0.5f, engine.guideVocalLevel)
+        session.stop()
+
+        assertNull(engine.guideVocal)
+        assertEquals(VocalEffects.None, engine.vocalEffects)
+    }
+
+    @Test
+    fun `a preview over the Original Audio has no Guide Vocal`() = runTest {
+        val session = openReady()
+        keepTake(session, fromMs = 30_000, lengthMs = 10_000)
+        val mix = mixes.observe(trackId).first().single()
+        mixes.chooseBacking(mix.id, BackingChoice.OriginalAudio)
+        mixes.updateSettings(mix.id, mix.settings.copy(guideVocalLevel = 0.5f))
+
+        session.previewMix(mix.id)
+
+        assertNull(engine.guideVocal)
+        assertEquals(0f, engine.guideVocalLevel)
     }
 
     private suspend fun keepTake(session: Session, fromMs: Long, lengthMs: Long): Take {

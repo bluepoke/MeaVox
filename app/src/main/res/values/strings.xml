@@ -268,4 +268,18 @@
     <!-- %1$s is the file's title, which stays English: Title (Instrumental, +2). -->
     <string name="backing_export_saved_as">Saved as “%1$s”</string>
     <string name="backing_export_transpose_once">For this export only; you keep singing at %1$s.</string>
+    <string name="mix_vocal_effects">Vocal Effects</string>
+    <string name="mix_reverb">Reverb</string>
+    <string name="mix_reverb_dry">Dry</string>
+    <string name="mix_reverb_room">Room</string>
+    <string name="mix_reverb_hall">Hall</string>
+    <string name="mix_compression">Gentle compression</string>
+    <string name="mix_compression_hint">Evens out loud and quiet passages.</string>
+    <string name="mix_high_pass">High-pass filter</string>
+    <string name="mix_high_pass_hint">Removes rumble and handling noise below the voice.</string>
+    <string name="mix_effects_hint">Only in this Mix: Review and Monitoring stay dry.</string>
+    <string name="mix_guide_vocal">Guide Vocal</string>
+    <string name="mix_guide_vocal_hint">Blends the original vocals into the instrumental, in your key. At 100 % it sounds like the original.</string>
+    <string name="mix_guide_vocal_vocal_free">This song has no vocals to blend in.</string>
+    <string name="mix_guide_vocal_original">The original audio has the vocals already.</string>
 </resources>

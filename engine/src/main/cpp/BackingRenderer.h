@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "VocalEffects.h"
 #include "signalsmith-stretch/signalsmith-stretch.h"
 
 namespace meavox {
@@ -66,9 +67,11 @@ private:
 
 // Take playback over Backing Audio already in [out] (interleaved stereo, timeline frames from
 // [firstFrame]): out = out × backingGain + take × takeGain, where Take sample j sounds at timeline
-// frame takeStart + j − alignment. Used by Review, the Mix Preview and the Offline Render.
+// frame takeStart + j − alignment. Used by Review, the Mix Preview and the Offline Render. With
+// [effects] set to any Vocal Effects, the Take goes through them first, one sample per timeline
+// frame (silence outside the Take, so a reverb rings on after it); without, it is mixed as it is.
 void mixTake(float *out, int32_t numFrames, int64_t firstFrame, int64_t takeStart, int64_t alignment, const float *take,
-             int64_t takeFrames, float backingGain, float takeGain);
+             int64_t takeFrames, float backingGain, float takeGain, VocalChain *effects = nullptr);
 
 // Clips interleaved stereo output to full scale.
 void clipOutput(float *out, int32_t numFrames);

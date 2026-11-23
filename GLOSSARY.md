@@ -22,7 +22,7 @@ Ubiquitous language for the project. Decisions are recorded in `docs/adr/`. The 
 | **Session** | — (not named in the UI) | Playing and singing over a Track on its screen: Backing Audio plays, Lyrics display, optional Monitoring, Practice Loop or recording of a Take, then Review. Opening a Track opens its Session once the Original Audio is stored. See ADR 9, ADR 20. |
 | **Start Position** | Startposition | Where on the Track timeline a Take begins; Takes may cover only part of the song. |
 | **Practice Loop** | Übungsschleife | A–B section looped without recording, for learning a passage. |
-| **Guide Vocal** | Leitstimme | The Vocal Stem blended into the headphones (Session) or into a Mix at low level. Never recorded. |
+| **Guide Vocal** | Leitstimme | The Vocal Stem blended into the headphones (Session) or into a Mix at low level. Never recorded. In a Mix it is part of the Backing Audio: blended into the Instrumental before Transpose, at a level from 0 (none) to 1 (as in the Original Audio). Only over an Instrumental. See ADR 7. |
 | **Review** | Anhören | Post-recording playback of a Take with Keep / Discard / Record again. |
 | **Review Balance** | Playback beim Anhören | The level of the Backing Audio under a Take while it plays back (Review and kept Takes), lower than the Take by default so the voice can be judged. Only for listening; a new Mix starts at it. _Avoid_: review volume, playback balance. |
 | **Monitoring** | Mithören | Optional, dry, real-time software routing of the mic to **wired/USB** headphones during a Session. Never over Bluetooth. Warns when the measured round trip is high. See ADR 4, ADR 13. |
@@ -36,12 +36,12 @@ Ubiquitous language for the project. Decisions are recorded in `docs/adr/`. The 
 | **Tap-to-Sync** | Mittippen | Editor in which the user taps per line during playback to turn plain Lyrics into synced Lyrics. |
 | **Page View** | Seitenansicht | Lyrics display as static pages/scrolling text; works with plain Lyrics. |
 | **Karaoke View** | Karaoke-Ansicht | Time-synced display: the current line is highlighted and word progress is interpolated within the line. Requires synced Lyrics. |
-| **Mix** | Mix | Non-destructive combination of one Backing Audio + one Take + Mix Settings, spanning the Take. Heard in a Mix Preview; rendered only for Export. See ADR 7. |
+| **Mix** | Mix | Non-destructive combination of one Backing Audio + one Take + Mix Settings, spanning the Take (and a reverb's tail). Heard in a Mix Preview; rendered only for Export. See ADR 7. |
 | **Mix Settings** | Mix-Einstellungen | Backing level, vocal level, Vocal Nudge, guide-vocal level, Vocal Effects. |
 | **Vocal Nudge** | Gesang verschieben | Manual ±200 ms alignment of a Take, applied on top of Latency Calibration. |
-| **Vocal Effects** | Gesangseffekte | Mix-time presets for the Take (reverb, compression, high-pass). Never applied to Monitoring. |
+| **Vocal Effects** | Gesangseffekte | Mix-time presets for the Take: a reverb (Dry, Room or Hall), gentle compression and a high-pass filter. Heard in the Mix Preview and rendered into an Export; never applied to Monitoring or Review. A reverb makes the Mix run on for its tail. See ADR 7. |
 | **Mix Editor** | Mix bearbeiten | Where one Mix's Backing Audio and Mix Settings are changed, heard in a Mix Preview and exported. _Avoid_: mixer. |
-| **Mix Preview** | Vorschau | A Mix played in the Session as it will be exported, from its Take's Start Position until the Take ends; changes to its Mix Settings are heard at once. _Avoid_: mix playback. |
+| **Mix Preview** | Vorschau | A Mix played in the Session as it will be exported, from its Take's Start Position until the Take ends (and a reverb's tail has rung out); changes to its Mix Settings are heard at once. _Avoid_: mix playback. |
 | **Offline Render** | — (not named in the UI) | The Audio Engine turning a Mix (or, for a Backing Export, the Backing Audio alone) into audio faster than real time, with the same processing as Review and the Mix Preview, so an Export sounds like them. See ADR 7. _Avoid_: bounce, mixdown. |
 | **Export** | Exportieren | Rendering a Mix, or a Track's Backing Audio alone (Backing Export), to WAV, MP3 or M4A/AAC in `Music/MeaVox/` or via share sheet. See ADR 8. |
 | **Backing Export** | Playback-Export | An Export of a Track's Backing Audio (Instrumental or Original Audio) alone at a chosen Transpose, with no Take, e.g. as a backing track for a live performance. _Avoid_: karaoke track, instrumental export. |

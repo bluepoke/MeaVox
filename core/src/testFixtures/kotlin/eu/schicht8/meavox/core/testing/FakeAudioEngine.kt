@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.core.testing
 
+import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.InputDevice
 import eu.schicht8.meavox.core.model.OutputRoute
@@ -199,13 +200,41 @@ class FakeAudioEngine(private val durationsMs: Map<AudioFile, Long> = emptyMap()
         state.update { if (it.playingTake) it.copy(playing = false, playingTake = false) else it }
     }
 
+    /** The Vocal Effects held Take audio plays with. */
+    var vocalEffects = VocalEffects.None
+        private set
+
+    override fun setVocalEffects(effects: VocalEffects) {
+        vocalEffects = effects
+    }
+
+    /** The Vocal Stem blended in as the Guide Vocal, if one is loaded. */
+    var guideVocal: AudioFile? = null
+        private set
+    var guideVocalLevel = 0f
+        private set
+
+    override suspend fun loadGuideVocal(file: AudioFile, fromFrame: Long): Boolean {
+        guideVocal = file
+        return true
+    }
+
+    override fun setGuideVocalLevel(level: Float) {
+        guideVocalLevel = level
+    }
+
+    override fun clearGuideVocal() {
+        guideVocal = null
+    }
+
     /** Simulates playback time passing; recording and Take playback stop at their ends. */
     fun advance(ms: Long) {
         val now = state.value
         if (!now.playing) return
         val position = (now.positionMs + ms).coerceAtMost(now.durationMs)
         state.update { it.copy(positionMs = position) }
-        val takeEndMs = heldTake?.let { (it.startFrame + it.frames) / FRAMES_PER_MS }
+        // Take playback runs on for the reverb's tail.
+        val takeEndMs = heldTake?.let { (it.startFrame + it.frames) / FRAMES_PER_MS + vocalEffects.reverb.tailMs }
         when {
             position >= now.durationMs -> {
                 if (now.recording) finishRecording()

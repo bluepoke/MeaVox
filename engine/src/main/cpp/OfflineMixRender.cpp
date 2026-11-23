@@ -6,8 +6,9 @@
 namespace meavox {
 
 OfflineMixRender::OfflineMixRender(int32_t sampleRate, int64_t from, int64_t to, int64_t takeStart, int64_t alignment,
-                                   int transpose, float backingGain, float takeGain)
-    : mTo(std::max(from, to)),
+                                   int transpose, float backingGain, float takeGain, VocalEffects effects, float guideLevel)
+    : mGuideLevel(guideLevel),
+      mTo(std::max(from, to)),
       mTakeStart(takeStart),
       mAlignment(alignment),
       mTranspose(std::clamp(transpose, -kMaxTranspose, kMaxTranspose)),
@@ -15,7 +16,18 @@ OfflineMixRender::OfflineMixRender(int32_t sampleRate, int64_t from, int64_t to,
       mTakeGain(takeGain),
       mPos(std::max<int64_t>(from, 0)) {
     mBacking.configure(sampleRate);
+    mEffects.configure(sampleRate);
+    mEffects.set(effects);
     mWindow.start = mPos;
+}
+
+void OfflineMixRender::appendGuide(const float *interleaved, int32_t frames, int32_t channels) {
+    const int32_t ch = std::max(1, channels);
+    for (int32_t i = 0; i < frames; ++i) {
+        const float l = interleaved[static_cast<size_t>(i) * ch];
+        mGuide.push_back(l);
+        mGuide.push_back(ch > 1 ? interleaved[static_cast<size_t>(i) * ch + 1] : l);
+    }
 }
 
 void OfflineMixRender::appendTake(const float *interleaved, int32_t frames, int32_t channels) {
@@ -35,10 +47,24 @@ void OfflineMixRender::Window::dropBefore(int64_t frame) {
 void OfflineMixRender::appendBacking(const float *interleaved, int32_t frames, int32_t channels) {
     const int32_t ch = std::max(1, channels);
     for (int32_t i = 0; i < frames; ++i, ++mFed) {
+        // The Guide Vocal frame of the same index, consumed in step (silence where none was fed).
+        float guideL = 0.0f;
+        float guideR = 0.0f;
+        if (mGuideRead < mGuide.size()) {
+            guideL = mGuide[mGuideRead];
+            guideR = mGuide[mGuideRead + 1];
+            mGuideRead += 2;
+        }
         if (mFed < mWindow.start) continue;  // before the rendered span: never read
         const float l = interleaved[static_cast<size_t>(i) * ch];
-        mWindow.frames.push_back(l);
-        mWindow.frames.push_back(ch > 1 ? interleaved[static_cast<size_t>(i) * ch + 1] : l);
+        const float r = ch > 1 ? interleaved[static_cast<size_t>(i) * ch + 1] : l;
+        // As GuidedFrames does in real time: before the stretcher, so the Guide Vocal is transposed too.
+        mWindow.frames.push_back(mGuideLevel > 0.0f ? l + guideL * mGuideLevel : l);
+        mWindow.frames.push_back(mGuideLevel > 0.0f ? r + guideR * mGuideLevel : r);
+    }
+    if (mGuideRead == mGuide.size()) {
+        mGuide.clear();
+        mGuideRead = 0;
     }
     renderAvailable();
 }
@@ -63,7 +89,7 @@ void OfflineMixRender::renderAvailable() {
         mBacking.render(mWindow, mPos, available, mBackingEnded, !mStarted, mTranspose, out, n);
         mStarted = true;
         mixTake(out, n, mPos, mTakeStart, mAlignment, mTake.data(), static_cast<int64_t>(mTake.size()), mBackingGain,
-                mTakeGain);
+                mTakeGain, &mEffects);
         clipOutput(out, n);
         mPos += n;
         mWindow.dropBefore(mPos);
