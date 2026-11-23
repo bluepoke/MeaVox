@@ -7,6 +7,9 @@ plugins {
     alias(libs.plugins.room)
 }
 
+/** Where Room exports each database version's schema; the migration tests read them (#26). */
+val schemas = "$projectDir/schemas"
+
 android {
     namespace = "eu.schicht8.meavox.data"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -22,12 +25,18 @@ android {
 
     testOptions {
         unitTests.all { it.useJUnitPlatform() }
+        // Robolectric reads the exported Room schemas as test assets (migration tests, #26).
+        unitTests.isIncludeAndroidResources = true
+    }
+
+    sourceSets {
+        getByName("test").assets.directories.add(schemas)
     }
 }
 
 room {
     // Exported schemas are committed so later migrations can be tested (spec #1, testing decisions).
-    schemaDirectory("$projectDir/schemas")
+    schemaDirectory(schemas)
 }
 
 dependencies {
@@ -40,4 +49,11 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
+
+    // Migration tests (#26): JUnit 4 on Robolectric, run on the JUnit Platform by the Vintage engine.
+    testImplementation(libs.room.testing)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.junit4)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }

@@ -23,6 +23,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6.4.1
 
+      # Robolectric downloads its Android framework jars into the Maven repository on first use.
+      - uses: actions/cache@v6.1.0
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
+
       # AGP installs the missing SDK platform, NDK and CMake on first use (licenses are
       # pre-accepted on GitHub's Ubuntu runners).
       - name: Build both flavors and run unit tests
