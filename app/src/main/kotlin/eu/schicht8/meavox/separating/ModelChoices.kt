@@ -24,13 +24,15 @@ class ModelChoices(
     private val catalogue: List<SeparationModel>,
     private val store: ModelStore,
     val default: DefaultSeparationModel,
+    /** A model's name in the user's language (#43), e.g. "Fast" or "Schnell". */
+    private val name: (SeparationModel) -> String,
 ) {
     /** Fastest first. Reads the disk to see which models are installed. */
     suspend fun options(): List<ModelOption> = withContext(Dispatchers.IO) {
         catalogue.map { model ->
             ModelOption(
                 id = model.id,
-                name = model.name,
+                name = name(model),
                 realTimeFactor = model.realTimeFactor,
                 keepsBackingVocals = model.keepsBackingVocals,
                 downloadBytes = model.download?.bytes?.takeUnless { store.isInstalled(model) },
@@ -38,5 +40,5 @@ class ModelChoices(
         }
     }
 
-    fun nameOf(id: SeparationModelId): String = catalogue.firstOrNull { it.id == id }?.name ?: id.value
+    fun nameOf(id: SeparationModelId): String = catalogue.firstOrNull { it.id == id }?.let(name) ?: id.value
 }

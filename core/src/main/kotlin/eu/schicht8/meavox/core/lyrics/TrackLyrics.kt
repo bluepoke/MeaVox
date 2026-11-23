@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.core.lyrics
 
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.port.LyricsCandidate
 import eu.schicht8.meavox.core.port.LyricsQuery
@@ -21,7 +22,7 @@ sealed interface TrackLyrics {
     data class NotFound(val query: LyricsQuery) : TrackLyrics
 
     /** The search failed for a [reason] that retrying won't fix; the user can search manually. */
-    data class Failed(val reason: String) : TrackLyrics
+    data class Failed(val reason: FailureReason) : TrackLyrics
 }
 
 /** The Lyrics to show: the suggested or confirmed match, if there is one. */

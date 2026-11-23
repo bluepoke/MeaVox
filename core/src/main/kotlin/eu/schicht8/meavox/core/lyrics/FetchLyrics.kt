@@ -2,6 +2,7 @@
 package eu.schicht8.meavox.core.lyrics
 
 import eu.schicht8.meavox.core.library.TrackRepository
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.port.LyricsProvider
 import eu.schicht8.meavox.core.port.LyricsUnavailable
@@ -42,7 +43,7 @@ class FetchLyrics(
             throw e
         } catch (e: Exception) {
             if (e is LyricsUnavailable && e.retryable && !lastAttempt) return Outcome.RetryLater
-            lyrics.set(id, TrackLyrics.Failed(e.message ?: "Lyrics search failed"))
+            lyrics.set(id, TrackLyrics.Failed(if (e is LyricsUnavailable) e.reason else FailureReason.unexpected(e)))
             return Outcome.Done
         }
         val best = LyricsRanking.rank(found, query).firstOrNull()

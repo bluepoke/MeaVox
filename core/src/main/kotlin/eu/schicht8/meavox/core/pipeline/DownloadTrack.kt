@@ -3,19 +3,21 @@ package eu.schicht8.meavox.core.pipeline
 
 import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.library.TrackRepository
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.model.TrackPipelineState
 import eu.schicht8.meavox.core.port.MediaDownloader
 import eu.schicht8.meavox.core.port.MediaUnavailable
 import eu.schicht8.meavox.core.port.Source
+import kotlin.math.floor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
-import kotlin.math.floor
 
 /**
  * The Downloading step of the Track Pipeline: a Source's audio becomes the Original Audio (ADR 10).
@@ -54,7 +56,7 @@ class DownloadTrack(
         }
         val failure = try {
             val source = sources.firstOrNull { it.id == id.source }
-                ?: throw MediaUnavailable("no Source '${id.source.value}' in this app", retryable = false)
+                ?: throw MediaUnavailable(FailureReason(FailureKind.SourceNotInApp, id.source.value), retryable = false)
             val media = source.resolve(id.sourceTrackId)
             val part = files.downloadPart(id, media.audioKey)
             // A part of another stream (the Source changed what it offers) can't be continued.
@@ -71,7 +73,7 @@ class DownloadTrack(
         } finally {
             storing.cancelAndJoin()
         }
-        val reason = failure?.let { it.message ?: it::class.simpleName ?: "unknown error" }
+        val reason = failure?.let { if (it is MediaUnavailable) it.reason else FailureReason.unexpected(it) }
         val failedAttempts = before.failedAttempts + 1
         when {
             failure == null -> {

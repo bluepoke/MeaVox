@@ -10,11 +10,13 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import eu.schicht8.meavox.MeaVoxApp
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.Track
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.model.TrackPipelineState
 import eu.schicht8.meavox.core.pipeline.DownloadTrack
+import eu.schicht8.meavox.ui.percent
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
@@ -65,14 +67,20 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
     private fun foregroundInfo(track: Track?): ForegroundInfo {
         val manager = applicationContext.getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL) == null) {
-            manager.createNotificationChannel(NotificationChannel(CHANNEL, "Downloads", NotificationManager.IMPORTANCE_LOW))
-        }
+        // Created again each time, which keeps the channel's name in the user's current language.
+        val name = applicationContext.getString(R.string.notification_channel_downloads)
+        manager.createNotificationChannel(NotificationChannel(CHANNEL, name, NotificationManager.IMPORTANCE_LOW))
         val progress = (track?.pipeline as? TrackPipelineState.Downloading)?.progress
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle(track?.title ?: "Downloading")
-            .setContentText(if (progress == null) "Waiting to download…" else "Downloading… ${(progress * 100).toInt()} %")
+            .setContentTitle(track?.title ?: applicationContext.getString(R.string.notification_downloading_title))
+            .setContentText(
+                if (progress == null) {
+                    applicationContext.getString(R.string.notification_waiting_to_download)
+                } else {
+                    applicationContext.getString(R.string.notification_downloading, percent(applicationContext.resources, progress))
+                },
+            )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setProgress(100, ((progress ?: 0f) * 100).toInt(), progress == null)

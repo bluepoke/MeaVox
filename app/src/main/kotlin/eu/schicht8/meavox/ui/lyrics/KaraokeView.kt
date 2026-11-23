@@ -11,9 +11,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -31,8 +31,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.lyrics.Karaoke
 import eu.schicht8.meavox.core.lyrics.LrcLine
 import eu.schicht8.meavox.core.port.Playback
@@ -110,7 +112,7 @@ fun KaraokeView(
 private fun OffsetControls(offsetMs: Long, onNudge: (Long) -> Unit, onReset: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            "Offset ${formatOffset(offsetMs)}",
+            stringResource(R.string.lyrics_offset, formatOffset(offsetMs)),
             style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(end = 4.dp),
@@ -124,7 +126,7 @@ private fun OffsetControls(offsetMs: Long, onNudge: (Long) -> Unit, onReset: () 
             shape = MaterialTheme.shapes.extraSmall,
             contentPadding = PaddingValues(horizontal = 6.dp),
             modifier = Modifier.height(28.dp),
-        ) { Text("Reset", style = MaterialTheme.typography.labelMedium) }
+        ) { Text(stringResource(R.string.action_reset), style = MaterialTheme.typography.labelMedium) }
     }
 }
 

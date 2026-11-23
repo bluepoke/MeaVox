@@ -2,6 +2,7 @@
 package eu.schicht8.meavox.core.port
 
 import eu.schicht8.meavox.core.model.AudioFile
+import eu.schicht8.meavox.core.model.FailureReason
 
 /** Downloads a Source's media stream into app storage (ADR 10). Implemented over HTTP; faked in tests. */
 interface MediaDownloader {
@@ -17,4 +18,4 @@ interface MediaDownloader {
  * busy, an expired stream URL) may work if the step runs again later; others (removed video,
  * region lock) won't.
  */
-class MediaUnavailable(message: String, val retryable: Boolean, cause: Throwable? = null) : Exception(message, cause)
+class MediaUnavailable(val reason: FailureReason, val retryable: Boolean, cause: Throwable? = null) : Exception(reason.toString(), cause)

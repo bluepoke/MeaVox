@@ -19,6 +19,7 @@ import eu.schicht8.meavox.core.lyrics.MatchLyrics
 import eu.schicht8.meavox.core.mix.ExportMix
 import eu.schicht8.meavox.core.mix.MixRepository
 import eu.schicht8.meavox.core.mix.Mixes
+import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.pipeline.DefaultSeparationModel
 import eu.schicht8.meavox.core.pipeline.DownloadTrack
 import eu.schicht8.meavox.core.pipeline.NotificationPrompt
@@ -39,10 +40,10 @@ import eu.schicht8.meavox.data.RoomMixRepository
 import eu.schicht8.meavox.data.RoomSettingsRepository
 import eu.schicht8.meavox.data.RoomTakeRepository
 import eu.schicht8.meavox.data.RoomTrackRepository
-import eu.schicht8.meavox.export.MediaStoreExports
 import eu.schicht8.meavox.downloading.HttpMediaDownloader
 import eu.schicht8.meavox.engine.NativeOfflineRenderer
 import eu.schicht8.meavox.engine.OboeAudioEngine
+import eu.schicht8.meavox.export.MediaStoreExports
 import eu.schicht8.meavox.importing.Importer
 import eu.schicht8.meavox.importing.LinkImporter
 import eu.schicht8.meavox.importing.PendingImport
@@ -54,11 +55,11 @@ import eu.schicht8.meavox.separating.WorkManagerPipelineJobs
 import eu.schicht8.meavox.separation.ModelSeparator
 import eu.schicht8.meavox.separation.ModelStore
 import eu.schicht8.meavox.separation.SeparationCatalogue
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
-import java.io.File
 
 /**
  * Manual dependency injection: the one place that wires adapters to the domain core.
@@ -105,7 +106,18 @@ class AppContainer(private val context: Context) {
     val defaultSeparationModel: DefaultSeparationModel by lazy {
         DefaultSeparationModel(settingsRepository, SeparationCatalogue.models.map { it.id }, fallback = SeparationCatalogue.default.id)
     }
-    val modelChoices: ModelChoices by lazy { ModelChoices(SeparationCatalogue.models, modelStore, defaultSeparationModel) }
+    val modelChoices: ModelChoices by lazy {
+        ModelChoices(SeparationCatalogue.models, modelStore, defaultSeparationModel) { model ->
+            modelNames[model.id]?.let(context::getString) ?: model.name
+        }
+    }
+
+    /** The tiers' names in the user's language (GLOSSARY: Separation Model, #43). */
+    private val modelNames = mapOf(
+        SeparationCatalogue.spleeter2Stems.id to R.string.model_fast,
+        SeparationCatalogue.uvrKaraoke.id to R.string.model_medium,
+        SeparationCatalogue.uvrInstHq4.id to R.string.model_best,
+    )
     val separateTrack: SeparateTrack by lazy { SeparateTrack(trackRepository, trackFiles, separator) }
     private val pipelineJobs by lazy { WorkManagerPipelineJobs(workManager) }
     val vocalFreeToggle: VocalFreeToggle by lazy {

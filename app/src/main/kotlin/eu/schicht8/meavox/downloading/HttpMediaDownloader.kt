@@ -2,15 +2,17 @@
 package eu.schicht8.meavox.downloading
 
 import eu.schicht8.meavox.core.model.AudioFile
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.port.MediaDownloader
 import eu.schicht8.meavox.core.port.MediaUnavailable
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 
 /**
  * [MediaDownloader] over HTTP byte ranges: the file is fetched in blocks appended to the part file,
@@ -52,14 +54,17 @@ class HttpMediaDownloader : MediaDownloader {
                             // Asked past the end: complete if the part is exactly the file, else start over.
                             val size = connection.getHeaderField("Content-Range")?.substringAfter('/')?.toLongOrNull()
                             if (size != null && size == done && done > 0) return@runInterruptible
-                            if (done == 0L) throw MediaUnavailable("the server has no data", retryable = false)
+                            if (done == 0L) throw MediaUnavailable(FailureReason(FailureKind.NoData), retryable = false)
                             file.writeBytes(ByteArray(0))
                             done = 0
                             continue
                         }
                         // Stream links expire after some hours; resolving the song again gives a new one.
-                        403, 410 -> throw MediaUnavailable("the download link expired", retryable = true)
-                        else -> throw MediaUnavailable("the server answered HTTP $status", retryable = status == 429 || status >= 500)
+                        403, 410 -> throw MediaUnavailable(FailureReason(FailureKind.LinkExpired), retryable = true)
+                        else -> {
+                            val busy = status == 429 || status >= 500
+                            throw MediaUnavailable(FailureReason(if (busy) FailureKind.ServerBusy else FailureKind.ServerError, "$status"), retryable = busy)
+                        }
                     }
                     val before = done
                     FileOutputStream(file, true).use { out ->
@@ -81,10 +86,10 @@ class HttpMediaDownloader : MediaDownloader {
                 }
             }
         } catch (e: IOException) {
-            throw MediaUnavailable("the connection broke: ${e.message}", retryable = true, e)
+            throw MediaUnavailable(FailureReason(FailureKind.ConnectionBroke, e.message), retryable = true, e)
         }
         val expected = total
-        if (expected != null && done < expected) throw MediaUnavailable("the download ended early", retryable = true)
+        if (expected != null && done < expected) throw MediaUnavailable(FailureReason(FailureKind.DownloadIncomplete), retryable = true)
     }
 
     private companion object {

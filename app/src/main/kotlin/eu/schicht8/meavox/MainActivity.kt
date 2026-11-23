@@ -39,6 +39,7 @@ import eu.schicht8.meavox.ui.NotificationPermissionPrompt
 import eu.schicht8.meavox.ui.library.LibraryRoute
 import eu.schicht8.meavox.ui.lyrics.LyricsSearchRoute
 import eu.schicht8.meavox.ui.models.ImportSheet
+import eu.schicht8.meavox.ui.resolve
 import eu.schicht8.meavox.ui.search.SearchRoute
 import eu.schicht8.meavox.ui.session.SessionRoute
 import eu.schicht8.meavox.ui.settings.SettingsRoute
@@ -67,9 +68,9 @@ class MainActivity : ComponentActivity() {
                             is LinkImporter.Result.Found -> container.pendingImport.value = PendingImport.Link(result.candidate)
                             is LinkImporter.Result.Added -> nav.openTrack(result.id)
                             LinkImporter.Result.Unsupported ->
-                                Toast.makeText(this@MainActivity, "MeaVox can't add songs from this link", Toast.LENGTH_LONG).show()
+                                Toast.makeText(this@MainActivity, R.string.link_unsupported, Toast.LENGTH_LONG).show()
                             is LinkImporter.Result.Failed ->
-                                Toast.makeText(this@MainActivity, "Can't add the song: ${result.reason}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(this@MainActivity, getString(R.string.link_failed, result.reason.resolve(resources)), Toast.LENGTH_LONG).show()
                         }
                     }
                 }
@@ -79,7 +80,7 @@ class MainActivity : ComponentActivity() {
                             // Opens the new Track, or the existing one for content imported before.
                             is Importer.Result.Imported -> nav.openTrack(result.id)
                             is Importer.Result.Failed ->
-                                Toast.makeText(this@MainActivity, "Import failed: ${result.reason}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(this@MainActivity, getString(R.string.import_failed, result.reason.resolve(resources)), Toast.LENGTH_LONG).show()
                         }
                     }
                 }

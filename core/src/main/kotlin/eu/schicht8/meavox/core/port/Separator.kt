@@ -3,6 +3,7 @@ package eu.schicht8.meavox.core.port
 
 import eu.schicht8.meavox.core.model.AppDirectory
 import eu.schicht8.meavox.core.model.AudioFile
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.SeparationModelId
 
 /** On-device Separation of Original Audio into Instrumental and Vocal Stem (ADR 2, ADR 3). */
@@ -42,7 +43,7 @@ data class SeparationProgress(val stage: Stage, val fraction: Float) {
  * Separation didn't finish. [retryable] failures (e.g. no network for the model download) may
  * succeed if the same Separation runs again later; others need the user to act.
  */
-class SeparationFailed(message: String, val retryable: Boolean, cause: Throwable? = null) : Exception(message, cause)
+class SeparationFailed(val reason: FailureReason, val retryable: Boolean, cause: Throwable? = null) : Exception(reason.toString(), cause)
 
 /** Where the Instrumental and Vocal Stem of one Separation are stored. */
 data class Stems(val instrumental: AudioFile, val vocalStem: AudioFile)

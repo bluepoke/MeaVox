@@ -11,6 +11,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import eu.schicht8.meavox.MeaVoxApp
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.Track
@@ -18,6 +19,7 @@ import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.model.TrackPipelineState
 import eu.schicht8.meavox.core.pipeline.SeparateTrack
 import eu.schicht8.meavox.core.port.SeparationProgress
+import eu.schicht8.meavox.ui.percent
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
@@ -73,15 +75,16 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
     private fun foregroundInfo(track: Track?): ForegroundInfo {
         createChannel()
         val progress = (track?.pipeline as? TrackPipelineState.Separating)?.progress
+        val context = applicationContext
         val text = when (progress?.stage) {
-            SeparationProgress.Stage.DownloadingModel -> "Downloading the vocal removal model…"
-            SeparationProgress.Stage.InstallingModel -> "Installing the vocal removal model… ${(progress.fraction * 100).toInt()} %"
-            SeparationProgress.Stage.Separating -> "Removing vocals… ${(progress.fraction * 100).toInt()} %"
-            null -> "Waiting to remove vocals…"
+            SeparationProgress.Stage.DownloadingModel -> context.getString(R.string.notification_downloading_model)
+            SeparationProgress.Stage.InstallingModel -> context.getString(R.string.notification_installing_model, percent(context.resources, progress.fraction))
+            SeparationProgress.Stage.Separating -> context.getString(R.string.notification_separating, percent(context.resources, progress.fraction))
+            null -> context.getString(R.string.notification_waiting_to_separate)
         }
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle(track?.title ?: "Removing vocals")
+            .setContentTitle(track?.title ?: context.getString(R.string.notification_separation_title))
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -98,8 +101,9 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
     private fun createChannel() {
         val manager = applicationContext.getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL) != null) return
-        manager.createNotificationChannel(NotificationChannel(CHANNEL, "Vocal removal", NotificationManager.IMPORTANCE_LOW))
+        // Created again each time, which keeps the channel's name in the user's current language.
+        val name = applicationContext.getString(R.string.notification_channel_separation)
+        manager.createNotificationChannel(NotificationChannel(CHANNEL, name, NotificationManager.IMPORTANCE_LOW))
     }
 
     companion object {

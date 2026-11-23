@@ -6,6 +6,8 @@ import eu.schicht8.meavox.core.export.BackingExportUnavailable
 import eu.schicht8.meavox.core.export.ExportBacking
 import eu.schicht8.meavox.core.library.RenameTrack
 import eu.schicht8.meavox.core.model.BackingChoice
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -20,14 +22,14 @@ import eu.schicht8.meavox.core.testing.FakeOfflineRenderer
 import eu.schicht8.meavox.core.testing.InMemoryLyricsRepository
 import eu.schicht8.meavox.core.testing.InMemoryTrackFiles
 import eu.schicht8.meavox.core.testing.InMemoryTrackRepository
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 
 class ExportBackingTest {
     private val trackId = TrackId(SourceId("youtube"), "abc")
@@ -89,7 +91,7 @@ class ExportBackingTest {
         addTrack(TrackPipelineState.Separating(FAST))
         for (state in listOf(
             TrackPipelineState.Separating(FAST),
-            TrackPipelineState.Failed(PipelineStep.Separating, "out of memory"),
+            TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.OutOfMemory)),
             TrackPipelineState.StemsDeleted(FAST),
         )) {
             tracks.updatePipeline(trackId, state)
@@ -104,7 +106,8 @@ class ExportBackingTest {
         addTrack(TrackPipelineState.Downloading(0.3f))
 
         assertEquals(emptyList(), exportBacking.options(trackId).layers)
-        assertFailsWith<BackingExportUnavailable> { exportBacking.export(trackId, BackingChoice.OriginalAudio, Transpose.None, ExportFormat.Wav()) }
+        val failure = assertFailsWith<BackingExportUnavailable> { exportBacking.export(trackId, BackingChoice.OriginalAudio, Transpose.None, ExportFormat.Wav()) }
+        assertEquals(BackingExportUnavailable.Why.NotDownloaded, failure.why)
     }
 
     @Test
@@ -166,7 +169,8 @@ class ExportBackingTest {
     fun `the Instrumental can't be exported before the Track is Ready with it`() = runTest {
         addTrack(TrackPipelineState.Separating(FAST))
 
-        assertFailsWith<BackingExportUnavailable> { exportBacking.export(trackId, BackingChoice.Instrumental, Transpose.None, ExportFormat.Wav()) }
+        val failure = assertFailsWith<BackingExportUnavailable> { exportBacking.export(trackId, BackingChoice.Instrumental, Transpose.None, ExportFormat.Wav()) }
+        assertEquals(BackingExportUnavailable.Why.InstrumentalNotReady, failure.why)
         assertEquals(emptyList(), store.exports)
     }
 

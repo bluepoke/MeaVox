@@ -19,7 +19,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.separating.ModelChoices
 import eu.schicht8.meavox.ui.theme.MeaVoxButtonShape
@@ -56,7 +58,7 @@ fun ImportSheet(
                     enabled = choice.loaded,
                     shape = MeaVoxButtonShape,
                 ) { Text(importLabel(choice)) }
-                TextButton(onClick = onDismiss, shape = MeaVoxButtonShape) { Text("Cancel") }
+                TextButton(onClick = onDismiss, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_cancel)) }
             }
             Spacer(Modifier.fillMaxWidth().height(16.dp))
         }

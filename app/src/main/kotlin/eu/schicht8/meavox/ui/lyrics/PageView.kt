@@ -11,7 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.lyrics.TrackLyrics
 import eu.schicht8.meavox.core.lyrics.pageText
 import eu.schicht8.meavox.ui.theme.MeaVoxTheme
@@ -27,11 +29,11 @@ fun PageView(lyrics: TrackLyrics?, modifier: Modifier = Modifier) {
         modifier.height(visibleLyricsHeight(MeaVoxTheme.type.lyricPage)).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         when (lyrics) {
-            null, TrackLyrics.Searching -> Text("Searching Lyrics…", color = muted)
+            null, TrackLyrics.Searching -> Text(stringResource(R.string.lyrics_searching), color = muted)
             is TrackLyrics.NotFound, is TrackLyrics.Failed ->
-                Text("No Lyrics for this Track yet. Search for them on the Track's page.", color = muted)
-            is TrackLyrics.Suggested -> Page(lyrics.lyrics.pageText(), "Suggested: ${lyrics.lyrics.name()} (${lyrics.lyrics.kind()})")
-            is TrackLyrics.Confirmed -> Page(lyrics.lyrics.pageText(), "${lyrics.lyrics.name()} (${lyrics.lyrics.kind()})")
+                Text(stringResource(R.string.lyrics_none_yet), color = muted)
+            is TrackLyrics.Suggested -> Page(lyrics.lyrics.pageText(), stringResource(R.string.lyrics_suggested_source, lyrics.lyrics.name(), lyrics.lyrics.kind()))
+            is TrackLyrics.Confirmed -> Page(lyrics.lyrics.pageText(), stringResource(R.string.lyrics_source, lyrics.lyrics.name(), lyrics.lyrics.kind()))
         }
     }
 }

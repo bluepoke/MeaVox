@@ -2,6 +2,8 @@
 package eu.schicht8.meavox.core
 
 import eu.schicht8.meavox.core.library.ImportLocalFile
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.TrackPipelineState
@@ -16,6 +18,8 @@ import eu.schicht8.meavox.core.testing.FakeSeparator
 import eu.schicht8.meavox.core.testing.InMemoryMixRepository
 import eu.schicht8.meavox.core.testing.InMemoryTrackFiles
 import eu.schicht8.meavox.core.testing.InMemoryTrackRepository
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -23,8 +27,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
-import kotlin.test.Test
-import kotlin.test.assertEquals
 
 class SeparateTrackTest {
     private val tracks = InMemoryTrackRepository()
@@ -74,13 +76,13 @@ class SeparateTrackTest {
     @Test
     fun `a Separation that cannot succeed leaves the Track Failed with the reason`() = runTest {
         val track = import(FakeLocalFile(displayName = "song.mp3", content = "audio-1"))
-        separator.failWith = SeparationFailed("no decoder for audio/x-weird", retryable = false)
+        separator.failWith = SeparationFailed(UNDECODABLE, retryable = false)
 
         val outcome = separate(track.id, fast)
 
         assertEquals(SeparateTrack.Outcome.Failed, outcome)
         assertEquals(
-            TrackPipelineState.Failed(PipelineStep.Separating, "no decoder for audio/x-weird"),
+            TrackPipelineState.Failed(PipelineStep.Separating, UNDECODABLE),
             tracks.get(track.id)?.pipeline,
         )
     }
@@ -90,7 +92,7 @@ class SeparateTrackTest {
         val track = import(FakeLocalFile(displayName = "song.mp3", content = "audio-1"))
         val lastProgress = SeparationProgress(SeparationProgress.Stage.DownloadingModel, 0.4f)
         separator.progress = listOf(lastProgress)
-        separator.failWith = SeparationFailed("network unreachable", retryable = true)
+        separator.failWith = SeparationFailed(FailureReason(FailureKind.ModelDownloadFailed, "network unreachable"), retryable = true)
 
         val outcome = separate(track.id, fast)
 
@@ -119,7 +121,7 @@ class SeparateTrackTest {
 
         assertEquals(SeparateTrack.Outcome.Failed, outcome)
         assertEquals(
-            TrackPipelineState.Failed(PipelineStep.Separating, "out of memory"),
+            TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.OutOfMemory)),
             tracks.get(track.id)?.pipeline,
         )
     }
@@ -127,7 +129,7 @@ class SeparateTrackTest {
     @Test
     fun `a job that runs after the Track's Separation already failed leaves it Failed`() = runTest {
         val track = import(FakeLocalFile(displayName = "song.mp3", content = "audio-1"))
-        val failed = TrackPipelineState.Failed(PipelineStep.Separating, "broken file")
+        val failed = TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.AudioUndecodable))
         tracks.updatePipeline(track.id, failed)
 
         val outcome = separate(track.id, fast) // e.g. queued behind the job that failed
@@ -204,5 +206,9 @@ class SeparateTrackTest {
         assertEquals(SeparateTrack.Outcome.Ready, bestJob.await())
         assertEquals(listOf(fast, best), separator.requests.map { it.model })
         assertEquals(TrackPipelineState.Ready(best), tracks.get(track.id)?.pipeline)
+    }
+
+    private companion object {
+        val UNDECODABLE = FailureReason(FailureKind.AudioUndecodable, "no decoder for audio/x-weird")
     }
 }

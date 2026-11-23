@@ -3,6 +3,8 @@ package eu.schicht8.meavox.core
 
 import eu.schicht8.meavox.core.lyrics.FetchLyrics
 import eu.schicht8.meavox.core.lyrics.TrackLyrics
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.Track
 import eu.schicht8.meavox.core.model.TrackId
@@ -13,9 +15,9 @@ import eu.schicht8.meavox.core.port.LyricsUnavailable
 import eu.schicht8.meavox.core.testing.FakeLyricsProvider
 import eu.schicht8.meavox.core.testing.InMemoryLyricsRepository
 import eu.schicht8.meavox.core.testing.InMemoryTrackRepository
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlinx.coroutines.test.runTest
 
 class FetchLyricsTest {
     private val tracks = InMemoryTrackRepository()
@@ -88,7 +90,7 @@ class FetchLyricsTest {
     fun `a search that may work later keeps the Lyrics Searching and asks to retry`() = runTest {
         val track = track("Michael Jackson - Beat It")
         lyrics.set(track.id, TrackLyrics.Searching)
-        provider.failWith = LyricsUnavailable("no network", retryable = true)
+        provider.failWith = LyricsUnavailable(FailureReason(FailureKind.ServiceUnreachable, "no network", service = "LRCLIB"), retryable = true)
 
         val outcome = fetch(track.id)
 
@@ -99,12 +101,12 @@ class FetchLyricsTest {
     @Test
     fun `a search that cannot succeed leaves the Lyrics Failed with the reason`() = runTest {
         val track = track("Michael Jackson - Beat It")
-        provider.failWith = LyricsUnavailable("LRCLIB answered HTTP 400", retryable = false)
+        provider.failWith = LyricsUnavailable(FailureReason(FailureKind.ServerError, "400", service = "LRCLIB"), retryable = false)
 
         val outcome = fetch(track.id)
 
         assertEquals(FetchLyrics.Outcome.Done, outcome)
-        assertEquals(TrackLyrics.Failed("LRCLIB answered HTTP 400"), lyrics.get(track.id))
+        assertEquals(TrackLyrics.Failed(FailureReason(FailureKind.ServerError, "400", service = "LRCLIB")), lyrics.get(track.id))
     }
 
     @Test
@@ -136,12 +138,12 @@ class FetchLyricsTest {
     fun `a search that keeps failing ends Failed at its last attempt instead of Searching forever`() = runTest {
         val track = track("Michael Jackson - Beat It")
         lyrics.set(track.id, TrackLyrics.Searching)
-        provider.failWith = LyricsUnavailable("LRCLIB is busy (HTTP 503)", retryable = true)
+        provider.failWith = LyricsUnavailable(FailureReason(FailureKind.ServerBusy, "503", service = "LRCLIB"), retryable = true)
 
         val outcome = fetch(track.id, lastAttempt = true)
 
         assertEquals(FetchLyrics.Outcome.Done, outcome)
-        assertEquals(TrackLyrics.Failed("LRCLIB is busy (HTTP 503)"), lyrics.get(track.id))
+        assertEquals(TrackLyrics.Failed(FailureReason(FailureKind.ServerBusy, "503", service = "LRCLIB")), lyrics.get(track.id))
     }
 
     @Test
@@ -152,6 +154,6 @@ class FetchLyricsTest {
         val outcome = fetch(track.id)
 
         assertEquals(FetchLyrics.Outcome.Done, outcome)
-        assertEquals(TrackLyrics.Failed("bug in the provider"), lyrics.get(track.id))
+        assertEquals(TrackLyrics.Failed(FailureReason(FailureKind.Unexpected, "bug in the provider")), lyrics.get(track.id))
     }
 }

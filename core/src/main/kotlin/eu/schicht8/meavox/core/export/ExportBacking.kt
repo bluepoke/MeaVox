@@ -51,10 +51,10 @@ class ExportBacking(
         format: ExportFormat,
         onProgress: (Float) -> Unit = {},
     ): ExportedFile {
-        val track = tracks.get(id) ?: throw BackingExportUnavailable("This Track was deleted.")
+        val track = tracks.get(id) ?: throw BackingExportUnavailable(BackingExportUnavailable.Why.TrackDeleted)
         if (!track.offers(layer)) {
             throw BackingExportUnavailable(
-                if (layer == BackingChoice.Instrumental) "The instrumental isn't ready yet." else "The song isn't downloaded yet.",
+                if (layer == BackingChoice.Instrumental) BackingExportUnavailable.Why.InstrumentalNotReady else BackingExportUnavailable.Why.NotDownloaded,
             )
         }
         val backing = files.fileOf(
@@ -104,5 +104,15 @@ fun backingExportTitle(track: Track, layer: BackingChoice, transpose: Transpose)
     return "${track.title} ($name$key)"
 }
 
-/** A Backing Export of that layer can't be made now, for [reason] (shown to the user). */
-class BackingExportUnavailable(val reason: String) : IllegalStateException(reason)
+/** A Backing Export of that layer can't be made now, because of [why]; the UI words it (#43). */
+class BackingExportUnavailable(val why: Why) : IllegalStateException(why.name) {
+    enum class Why {
+        TrackDeleted,
+
+        /** The Track isn't Ready with an Instrumental. */
+        InstrumentalNotReady,
+
+        /** The Original Audio isn't stored yet. */
+        NotDownloaded,
+    }
+}

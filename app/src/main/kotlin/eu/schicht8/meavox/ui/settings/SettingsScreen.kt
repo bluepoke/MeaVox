@@ -25,9 +25,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.session.SettingsRepository
 import eu.schicht8.meavox.separating.ModelChoices
@@ -50,15 +52,14 @@ fun SettingsRoute(choices: ModelChoices, settings: SettingsRepository) {
         singer = settings.singerName().orEmpty()
     }
     val scope = rememberCoroutineScope()
-    Scaffold(topBar = { TopAppBar(title = { Text("Settings") }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.settings_title)) }) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Default vocal removal", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_default_model), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Pre-selected when you add a song or re-separate one; you can pick another there. " +
-                    "Changing it doesn't touch songs already added. A model is downloaded the first time it is used.",
+                stringResource(R.string.settings_default_model_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -67,9 +68,9 @@ fun SettingsRoute(choices: ModelChoices, settings: SettingsRepository) {
                 scope.launch { choices.default.set(model) }
             }, durationMs = null)
             Spacer(Modifier.height(16.dp))
-            Text("Your name", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_your_name), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Exported Mixes name you as the singer next to the artist: “<artist> feat. <your name>”.",
+                stringResource(R.string.settings_your_name_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -81,7 +82,7 @@ fun SettingsRoute(choices: ModelChoices, settings: SettingsRepository) {
                         scope.launch { settings.setSingerName(it) }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Name") },
+                    placeholder = { Text(stringResource(R.string.settings_name)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                 )

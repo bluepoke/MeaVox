@@ -2,6 +2,8 @@
 package eu.schicht8.meavox.core
 
 import eu.schicht8.meavox.core.library.Library
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.TrackPipelineState
@@ -92,13 +94,13 @@ class DownloadTrackTest {
     @Test
     fun `a song the Source can't give leaves the Track Failed with the reason`() = runTest {
         val track = library.add(youtube.add("gone", "Removed video"))
-        youtube.resolveFailure = MediaUnavailable("This video has been removed by the uploader", retryable = false)
+        youtube.resolveFailure = MediaUnavailable(FailureReason(FailureKind.TrackUnavailable, "This video has been removed by the uploader", service = "YouTube"), retryable = false)
 
         val outcome = download(track.id)
 
         assertEquals(DownloadTrack.Outcome.Done, outcome)
         assertEquals(
-            TrackPipelineState.Failed(PipelineStep.Downloading, "This video has been removed by the uploader"),
+            TrackPipelineState.Failed(PipelineStep.Downloading, FailureReason(FailureKind.TrackUnavailable, "This video has been removed by the uploader", service = "YouTube")),
             tracks.get(track.id)?.pipeline,
         )
     }
@@ -112,7 +114,7 @@ class DownloadTrackTest {
         val outcomes = List(5) { download(track.id) }
 
         assertEquals(List(4) { DownloadTrack.Outcome.RetryLater } + DownloadTrack.Outcome.Done, outcomes)
-        assertEquals(TrackPipelineState.Failed(PipelineStep.Downloading, "connection lost"), tracks.get(track.id)?.pipeline)
+        assertEquals(TrackPipelineState.Failed(PipelineStep.Downloading, CONNECTION_BROKE), tracks.get(track.id)?.pipeline)
         assertEquals("0123", files.partContent(files.downloadPart(track.id, "fake-audio")).decodeToString())
     }
 
@@ -125,7 +127,7 @@ class DownloadTrackTest {
 
         download(track.id)
 
-        assertEquals(TrackPipelineState.Downloading(0.4f, retryReason = "connection lost", failedAttempts = 1), tracks.get(track.id)?.pipeline)
+        assertEquals(TrackPipelineState.Downloading(0.4f, retryReason = CONNECTION_BROKE, failedAttempts = 1), tracks.get(track.id)?.pipeline)
     }
 
     @Test
@@ -146,13 +148,26 @@ class DownloadTrackTest {
     }
 
     @Test
+    fun `a Track from a Source this app doesn't have ends Failed naming the Source`() = runTest {
+        val soundcloud = FakeSource(SourceId("soundcloud"))
+        val track = library.add(soundcloud.add("song", "Song"))
+
+        download(track.id)
+
+        assertEquals(
+            TrackPipelineState.Failed(PipelineStep.Downloading, FailureReason(FailureKind.SourceNotInApp, "soundcloud")),
+            tracks.get(track.id)?.pipeline,
+        )
+    }
+
+    @Test
     fun `an unexpected error ends the download Failed`() = runTest {
         val track = library.add(youtube.add("beat-it", "Beat It"))
         youtube.resolveFailure = IllegalStateException("extractor broke")
 
         download(track.id)
 
-        assertEquals(TrackPipelineState.Failed(PipelineStep.Downloading, "extractor broke"), tracks.get(track.id)?.pipeline)
+        assertEquals(TrackPipelineState.Failed(PipelineStep.Downloading, FailureReason(FailureKind.Unexpected, "extractor broke")), tracks.get(track.id)?.pipeline)
     }
 
     @Test
@@ -165,5 +180,10 @@ class DownloadTrackTest {
 
         assertEquals(listOf(0L), downloader.startedAt)
         assertEquals(TrackPipelineState.Downloaded, tracks.get(track.id)?.pipeline)
+    }
+
+    private companion object {
+        /** What the fake downloader fails with. */
+        val CONNECTION_BROKE = FailureReason(FailureKind.ConnectionBroke)
     }
 }

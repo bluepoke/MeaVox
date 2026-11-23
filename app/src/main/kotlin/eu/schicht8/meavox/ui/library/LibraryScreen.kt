@@ -36,6 +36,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -43,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.library.Library
 import eu.schicht8.meavox.core.library.LibraryEntry
 import eu.schicht8.meavox.core.library.RenameTrack
@@ -100,16 +104,16 @@ fun LibraryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Library") },
+                title = { Text(stringResource(R.string.library_title)) },
                 actions = {
-                    if (onSearch != null) TextButton(onClick = onSearch) { Text("Search songs") }
-                    TextButton(onClick = onStorage) { Text("Storage") }
+                    if (onSearch != null) TextButton(onClick = onSearch) { Text(stringResource(R.string.search_title)) }
+                    TextButton(onClick = onStorage) { Text(stringResource(R.string.storage_title)) }
                     var menu by remember { mutableStateOf(false) }
                     Box {
                         TextButton(onClick = { menu = true }) { Text("⋮") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Settings") },
+                                text = { Text(stringResource(R.string.settings_title)) },
                                 onClick = {
                                     menu = false
                                     onSettings()
@@ -120,7 +124,7 @@ fun LibraryScreen(
                 },
             )
         },
-        floatingActionButton = { ExtendedFloatingActionButton(onClick = onImport) { Text("Import file") } },
+        floatingActionButton = { ExtendedFloatingActionButton(onClick = onImport) { Text(stringResource(R.string.library_import_file)) } },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (importing) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -142,9 +146,9 @@ private fun EmptyLibrary() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("No songs yet", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.library_empty), style = MaterialTheme.typography.titleLarge)
         Text(
-            "Import an audio or video file, or share one to MeaVox from another app.",
+            stringResource(R.string.library_empty_hint),
             modifier = Modifier.padding(top = 8.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -164,7 +168,7 @@ private fun TrackList(entries: List<LibraryEntry>, onOpen: (TrackId) -> Unit, on
                 TrackRow(entry, onClick = { onOpen(entry.track.id) }, onLongClick = { menu = true })
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
-                        text = { Text("Rename") },
+                        text = { Text(stringResource(R.string.action_rename)) },
                         onClick = {
                             menu = false
                             renaming = entry.track
@@ -211,28 +215,34 @@ private fun RenameTrackDialog(track: Track, onRename: (title: String, artist: St
     var artist by remember(track.id) { mutableStateOf(track.artist.orEmpty()) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename song") },
+        title = { Text(stringResource(R.string.library_rename_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = title, onValueChange = { title = it }, Modifier.fillMaxWidth(), label = { Text("Title") }, singleLine = true)
-                OutlinedTextField(value = artist, onValueChange = { artist = it }, Modifier.fillMaxWidth(), label = { Text("Artist") }, singleLine = true)
+                OutlinedTextField(value = title, onValueChange = { title = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.lyrics_search_song_title)) }, singleLine = true)
+                OutlinedTextField(value = artist, onValueChange = { artist = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.lyrics_search_artist)) }, singleLine = true)
             }
         },
         confirmButton = {
-            TextButton(onClick = { onRename(title, artist) }, enabled = title.isNotBlank(), shape = MeaVoxButtonShape) { Text("Rename") }
+            TextButton(onClick = { onRename(title, artist) }, enabled = title.isNotBlank(), shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_rename)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss, shape = MeaVoxButtonShape) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
-private fun takeCount(count: Int): String = when (count) {
-    0 -> "No Takes"
-    1 -> "1 Take"
-    else -> "$count Takes"
-}
+@Composable
+private fun takeCount(count: Int): String =
+    if (count == 0) stringResource(R.string.library_no_takes) else pluralStringResource(R.plurals.library_takes, count, count)
 
+@Composable
 private fun lastSung(at: Long?): String =
-    if (at == null) "Not sung yet" else "Sung ${DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)}"
+    if (at == null) {
+        stringResource(R.string.library_not_sung)
+    } else {
+        // Android words it to stand alone ("Yesterday", "Vor 3 Tagen"); here it follows a verb.
+        val locale = LocalConfiguration.current.locales[0]
+        val ago = DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)
+        stringResource(R.string.library_sung, ago.toString().replaceFirstChar { it.lowercase(locale) })
+    }
 
 @Preview
 @Composable

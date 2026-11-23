@@ -4,6 +4,8 @@ package eu.schicht8.meavox.core
 import eu.schicht8.meavox.core.library.RenameTrack
 import eu.schicht8.meavox.core.lyrics.LyricsPipeline
 import eu.schicht8.meavox.core.lyrics.TrackLyrics
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.Track
 import eu.schicht8.meavox.core.model.TrackId
@@ -13,14 +15,14 @@ import eu.schicht8.meavox.core.port.LyricsQuery
 import eu.schicht8.meavox.core.testing.FakePipelineJobs
 import eu.schicht8.meavox.core.testing.InMemoryLyricsRepository
 import eu.schicht8.meavox.core.testing.InMemoryTrackRepository
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RenameTrackTest {
@@ -82,7 +84,7 @@ class RenameTrackTest {
     @Test
     fun `Lyrics whose search failed are searched again with the new name`() = runTest {
         val track = track()
-        lyrics.set(track.id, TrackLyrics.Failed("LRCLIB unreachable"))
+        lyrics.set(track.id, TrackLyrics.Failed(FailureReason(FailureKind.ServiceUnreachable, service = "LRCLIB")))
 
         rename(track.id, title = "Beat It", artist = "Michael Jackson")
 

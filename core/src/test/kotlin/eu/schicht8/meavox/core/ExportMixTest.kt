@@ -173,7 +173,8 @@ class ExportMixTest {
     fun `a Mix can't be exported while its Instrumental is being made again`() = runTest {
         val mix = arrange(TrackPipelineState.StemsDeleted(FAST), BackingAudio.Instrumental(FAST))
 
-        assertFailsWith<MixUnavailable> { export.export(mix.id, ExportFormat.Wav()) }
+        val failure = assertFailsWith<MixUnavailable> { export.export(mix.id, ExportFormat.Wav()) }
+        assertEquals(MixUnavailable.Why.InstrumentalNotReady, failure.why)
         assertEquals(emptyList(), store.exports)
     }
 

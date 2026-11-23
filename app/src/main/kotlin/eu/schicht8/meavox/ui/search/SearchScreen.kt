@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.library.Library
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -55,11 +57,14 @@ import eu.schicht8.meavox.core.port.MediaUnavailable
 import eu.schicht8.meavox.core.port.Source
 import eu.schicht8.meavox.core.port.SourceCandidate
 import eu.schicht8.meavox.separating.ModelChoices
+import eu.schicht8.meavox.ui.UiText
 import eu.schicht8.meavox.ui.formatTime
 import eu.schicht8.meavox.ui.models.ImportChoice
 import eu.schicht8.meavox.ui.models.ImportOptions
 import eu.schicht8.meavox.ui.models.importLabel
 import eu.schicht8.meavox.ui.models.rememberImportChoice
+import eu.schicht8.meavox.ui.resolve
+import eu.schicht8.meavox.ui.text
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -79,9 +84,9 @@ class SearchViewModel(private val sources: List<Source>, private val library: Li
     val results: StateFlow<List<SourceCandidate>?> = _results
     private val _searching = MutableStateFlow(false)
     val searching: StateFlow<Boolean> = _searching
-    private val _errors = MutableStateFlow<List<String>>(emptyList())
+    private val _errors = MutableStateFlow<List<UiText>>(emptyList())
     /** One line per Source that couldn't be searched. */
-    val errors: StateFlow<List<String>> = _errors
+    val errors: StateFlow<List<UiText>> = _errors
     private val _preview = MutableStateFlow<SourceCandidate?>(null)
     val preview: StateFlow<SourceCandidate?> = _preview
     val player = PreviewPlayer()
@@ -106,7 +111,7 @@ class SearchViewModel(private val sources: List<Source>, private val library: Li
             }.awaitAll()
             _results.value = outcomes.flatMap { it.getOrDefault(emptyList()) }
             _errors.value = outcomes.zip(chosen).mapNotNull { (outcome, source) ->
-                outcome.exceptionOrNull()?.let { "${source.name}: ${it.message}" }
+                outcome.exceptionOrNull()?.let { UiText.of(R.string.search_failed_at, source.name, it.reasonText()) }
             }
             _searching.value = false
         }
@@ -135,7 +140,7 @@ class SearchViewModel(private val sources: List<Source>, private val library: Li
                 val uri = source.resolve(candidate.id.sourceTrackId).audioUri
                 if (_preview.value == candidate) player.play(uri)
             } catch (e: MediaUnavailable) {
-                _errors.value = listOf("${source.name}: ${e.message}")
+                _errors.value = listOf(UiText.of(R.string.search_failed_at, source.name, e.reason.text()))
                 player.stop()
             }
         }
@@ -207,19 +212,19 @@ fun SearchScreen(
     selected: Set<SourceId>,
     results: List<SourceCandidate>?,
     searching: Boolean,
-    errors: List<String>,
+    errors: List<UiText>,
     onQuery: (String) -> Unit,
     onToggleSource: (SourceId) -> Unit,
     onSearch: () -> Unit,
     /** A result was tapped: its preview opens, or its Track if it is in the Library already. */
     onChoose: (SourceCandidate) -> Unit,
 ) {
-    Scaffold(topBar = { TopAppBar(title = { Text("Search songs") }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.search_title)) }) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = query,
                 onValueChange = onQuery,
-                label = { Text("Artist and title") },
+                label = { Text(stringResource(R.string.search_query)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
@@ -229,11 +234,11 @@ fun SearchScreen(
                 for (source in sources) {
                     FilterChip(source.id in selected, { onToggleSource(source.id) }, label = { Text(source.name) })
                 }
-                Button(onClick = onSearch, enabled = query.isNotBlank() && !searching) { Text("Search") }
+                Button(onClick = onSearch, enabled = query.isNotBlank() && !searching) { Text(stringResource(R.string.action_search)) }
             }
             if (searching) LinearProgressIndicator(Modifier.fillMaxWidth())
-            for (error in errors) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            if (results?.isEmpty() == true && errors.isEmpty()) Text("Nothing found. Try other words or another Source.")
+            for (error in errors) Text(error.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            if (results?.isEmpty() == true && errors.isEmpty()) Text(stringResource(R.string.search_nothing_found))
             LazyColumn(Modifier.weight(1f)) {
                 items(results.orEmpty(), key = { it.id.key }) { candidate ->
                     ListItem(
@@ -279,14 +284,14 @@ private fun PreviewSheet(
             )
             when (player) {
                 PreviewPlayer.State.Idle, PreviewPlayer.State.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                PreviewPlayer.State.Failed -> Text("The preview can't be played.", color = MaterialTheme.colorScheme.error)
+                PreviewPlayer.State.Failed -> Text(stringResource(R.string.search_preview_unplayable), color = MaterialTheme.colorScheme.error)
                 else -> Unit
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = onTogglePlay,
                     enabled = player == PreviewPlayer.State.Playing || player == PreviewPlayer.State.Paused,
-                ) { Text(if (player == PreviewPlayer.State.Playing) "Pause" else "Play") }
+                ) { Text(stringResource(if (player == PreviewPlayer.State.Playing) R.string.action_pause else R.string.action_play)) }
             }
             ImportOptions(choice, candidate.durationMs)
             // Adding with the defaults stays one tap (ADR 19).
@@ -297,3 +302,6 @@ private fun PreviewSheet(
         }
     }
 }
+
+/** Why a search failed: the Source's reason, or the error's own message. */
+private fun Throwable.reasonText(): UiText = if (this is MediaUnavailable) reason.text() else text()

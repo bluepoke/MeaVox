@@ -7,6 +7,8 @@ import eu.schicht8.meavox.core.library.ImportLocalFile
 import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.TrackId
+import eu.schicht8.meavox.ui.UiText
+import eu.schicht8.meavox.ui.text
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,7 +38,7 @@ class Importer(
     sealed interface Result {
         /** The new Track, or the existing one for content imported before. */
         data class Imported(val id: TrackId) : Result
-        data class Failed(val reason: String) : Result
+        data class Failed(val reason: UiText) : Result
     }
 
     private val queue = Dispatchers.IO.limitedParallelism(1)
@@ -59,7 +61,7 @@ class Importer(
             val result = try {
                 Result.Imported(importLocalFile(UriLocalFile(resolver, uri), vocalFree, model).id)
             } catch (e: Exception) {
-                Result.Failed(e.message ?: e::class.simpleName ?: "unknown error")
+                Result.Failed(e.text())
             } finally {
                 running.update { it - 1 }
             }

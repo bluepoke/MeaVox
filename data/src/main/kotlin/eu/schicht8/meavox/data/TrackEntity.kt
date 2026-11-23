@@ -4,6 +4,8 @@ package eu.schicht8.meavox.data
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import eu.schicht8.meavox.core.model.BackingChoice
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -25,8 +27,15 @@ internal data class TrackEntity(
     @ColumnInfo(name = "added_at") val addedAt: Long,
     /** Progress of a running step, e.g. `separating:0.42` (version 3, #7) or `downloading:0.42:1` (#6). */
     @ColumnInfo(name = "pipeline_progress") val pipelineProgress: String? = null,
-    /** Why the Track is Failed (version 3, #7), or why a download waits to retry (#6). */
+    /**
+     * Why the Track is Failed (version 3, #7), or why a download waits to retry (#6): the reason's
+     * detail since version 14, the whole reason as English text before (see [FailureColumns]).
+     */
     @ColumnInfo(name = "pipeline_failure") val pipelineFailure: String? = null,
+    /** The kind of that reason as a stable code (version 14, #43); null for rows from before. */
+    @ColumnInfo(name = "pipeline_failure_kind") val pipelineFailureKind: String? = null,
+    /** The Source or service the reason names (version 14, #43). */
+    @ColumnInfo(name = "pipeline_failure_service") val pipelineFailureService: String? = null,
     /** When a Take of the Track last started recording (version 8, #20; since #34 not on opening). */
     @ColumnInfo(name = "last_session_at") val lastSessionAt: Long? = null,
     /** The Track is Vocal-Free (version 9, #25). */
@@ -50,7 +59,9 @@ internal fun Track.toEntity(addedAt: Long): TrackEntity {
         pipelineState = pipelineColumns.state,
         addedAt = addedAt,
         pipelineProgress = pipelineColumns.progress,
-        pipelineFailure = pipelineColumns.failure,
+        pipelineFailure = pipelineColumns.failure.detail,
+        pipelineFailureKind = pipelineColumns.failure.kind,
+        pipelineFailureService = pipelineColumns.failure.service,
         lastSessionAt = lastSessionAt,
         vocalFree = vocalFree,
         backingChoice = backingChoice.toColumn(),
@@ -64,7 +75,7 @@ internal fun TrackEntity.toTrack() = Track(
     title = title,
     artist = artist,
     durationMs = durationMs,
-    pipeline = PipelineColumns(pipelineState, pipelineProgress, pipelineFailure).toState(),
+    pipeline = PipelineColumns(pipelineState, pipelineProgress, FailureColumns(kind = pipelineFailureKind, detail = pipelineFailure, service = pipelineFailureService)).toState(),
     lastSessionAt = lastSessionAt,
     vocalFree = vocalFree,
     backingChoice = backingChoiceFromColumn(backingChoice),
@@ -84,19 +95,23 @@ private fun backingChoiceFromColumn(value: String): BackingChoice = when (value)
 }
 
 /** The pipeline columns of a row. Stored as stable strings so enum/class renames don't corrupt data. */
-internal data class PipelineColumns(val state: String, val progress: String? = null, val failure: String? = null)
+internal data class PipelineColumns(
+    val state: String,
+    val progress: String? = null,
+    val failure: FailureColumns = FailureColumns(null, null, null),
+)
 
 internal fun TrackPipelineState.toColumns(): PipelineColumns = when (this) {
     TrackPipelineState.Added -> PipelineColumns("added")
     // progress `downloading:<fraction or empty>:<failed attempts>`, failure the reason it waits to retry
     is TrackPipelineState.Downloading ->
-        PipelineColumns("downloading", progress = "downloading:${progress ?: ""}:$failedAttempts", failure = retryReason)
+        PipelineColumns("downloading", progress = "downloading:${progress ?: ""}:$failedAttempts", failure = retryReason.toColumns())
     TrackPipelineState.Downloaded -> PipelineColumns("downloaded")
     is TrackPipelineState.Separating -> PipelineColumns("$SEPARATING_PREFIX${model.value}", progress = progress?.toColumn())
     // A Vocal-Free Track is Ready without stems (ADR 14): plain `ready`.
     is TrackPipelineState.Ready -> PipelineColumns(model?.let { "$READY_PREFIX${it.value}" } ?: READY)
     is TrackPipelineState.StemsDeleted -> PipelineColumns("$STEMS_DELETED_PREFIX${model.value}")
-    is TrackPipelineState.Failed -> PipelineColumns("$FAILED_PREFIX${step.toColumn()}", failure = reason)
+    is TrackPipelineState.Failed -> PipelineColumns("$FAILED_PREFIX${step.toColumn()}", failure = reason.toColumns())
 }
 
 private fun PipelineColumns.toState(): TrackPipelineState = when {
@@ -105,7 +120,7 @@ private fun PipelineColumns.toState(): TrackPipelineState = when {
         val parts = progress?.split(':').orEmpty()
         TrackPipelineState.Downloading(
             progress = parts.getOrNull(1)?.toFloatOrNull(),
-            retryReason = failure,
+            retryReason = failure.toReason(),
             failedAttempts = parts.getOrNull(2)?.toIntOrNull() ?: 0,
         )
     }
@@ -117,7 +132,10 @@ private fun PipelineColumns.toState(): TrackPipelineState = when {
     state.startsWith(STEMS_DELETED_PREFIX) ->
         TrackPipelineState.StemsDeleted(SeparationModelId(state.removePrefix(STEMS_DELETED_PREFIX)))
     state.startsWith(FAILED_PREFIX) ->
-        TrackPipelineState.Failed(stepFromColumn(state.removePrefix(FAILED_PREFIX)), failure.orEmpty())
+        TrackPipelineState.Failed(
+            stepFromColumn(state.removePrefix(FAILED_PREFIX)),
+            failure.toReason() ?: FailureReason(FailureKind.Unexpected),
+        )
     else -> error("unknown pipeline state '$state'")
 }
 

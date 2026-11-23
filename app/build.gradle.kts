@@ -45,6 +45,20 @@ android {
         compose = true
     }
 
+    // English and German (#43). The generated locale config lets Android 13+ offer the app's
+    // languages in its per-app language setting; values/ is English (res/resources.properties).
+    androidResources {
+        generateLocaleConfig = true
+    }
+
+    lint {
+        error += listOf("MissingTranslation", "HardcodedUiText")
+    }
+
+    testOptions {
+        unitTests.all { it.useJUnitPlatform() }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -63,6 +77,12 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":engine"))
     implementation(project(":export"))
+    lintChecks(project(":lint-checks"))
+
+    testImplementation(libs.kotlin.test.junit5)
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
     implementation(project(":separation"))
     implementation(project(":lyrics"))
     // ADR 1: the NewPipe Sources ship in the network flavor only.

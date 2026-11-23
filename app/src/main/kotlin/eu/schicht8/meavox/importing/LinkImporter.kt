@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.importing
 
+import androidx.annotation.StringRes
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.library.Library
 import eu.schicht8.meavox.core.library.LookUpSharedLink
 import eu.schicht8.meavox.core.library.TrackRepository
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.TrackId
+import eu.schicht8.meavox.core.port.MediaUnavailable
 import eu.schicht8.meavox.core.port.SourceCandidate
+import eu.schicht8.meavox.ui.UiText
+import eu.schicht8.meavox.ui.text
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
@@ -35,7 +41,7 @@ class LinkImporter(
         /** No Source knows the link, or it holds no link at all. */
         data object Unsupported : Result
 
-        data class Failed(val reason: String) : Result
+        data class Failed(val reason: UiText) : Result
     }
 
     // Buffered until collected: a share that starts the app arrives before the screen listens.
@@ -45,7 +51,7 @@ class LinkImporter(
     /** Looks up [text] as shared, e.g. "Check this out https://youtu.be/…": the first link in it counts. */
     fun lookUp(text: String) {
         val url = link.find(text)?.value?.trimEnd(*TRAILING_PUNCTUATION) ?: return run { _results.trySend(Result.Unsupported) }
-        report("the link can't be opened") {
+        report(R.string.link_cant_open) {
             val candidate = lookUpSharedLink(url) ?: return@report Result.Unsupported
             // Added before: it opens as it is, without asking again.
             if (tracks.get(candidate.id) != null) Result.Added(candidate.id) else Result.Found(candidate)
@@ -54,17 +60,18 @@ class LinkImporter(
 
     /** Adds [candidate] as the import sheet asked: marked [vocalFree] (ADR 14), or to be separated with [model] (ADR 19). */
     fun add(candidate: SourceCandidate, vocalFree: Boolean, model: SeparationModelId?) {
-        report("the song can't be added") { Result.Added(library.add(candidate, vocalFree, model).id) }
+        report(R.string.link_cant_add) { Result.Added(library.add(candidate, vocalFree, model).id) }
     }
 
-    private fun report(failure: String, block: suspend () -> Result) {
+    private fun report(@StringRes failure: Int, block: suspend () -> Result) {
         scope.launch {
             val result = try {
                 block()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Result.Failed(e.message ?: failure)
+                val why = if (e is MediaUnavailable) e.reason else FailureReason.unexpected(e)
+                Result.Failed(UiText.of(R.string.failure_with_detail, UiText.of(failure), why.text()))
             }
             _results.send(result)
         }

@@ -19,9 +19,11 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.export.backingExportTitle
 import eu.schicht8.meavox.core.model.BackingChoice
 import eu.schicht8.meavox.core.model.Track
@@ -33,14 +35,14 @@ import eu.schicht8.meavox.core.port.ExportFormat
 internal fun BackingExportRow(onOpen: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Backing track", style = rowLabel())
+            Text(stringResource(R.string.backing_export_row), style = rowLabel())
             Text(
-                "Export the backing alone, in your key, e.g. for a live performance.",
+                stringResource(R.string.backing_export_row_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        NeutralOutlinedButton("Export", onOpen, Modifier.height(44.dp))
+        NeutralOutlinedButton(stringResource(R.string.export), onOpen, Modifier.height(44.dp))
     }
 }
 
@@ -66,9 +68,9 @@ internal fun BackingExportSheet(dialog: BackingExportDialog, track: Track, actio
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Export backing track", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.backing_export_title), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "The whole song without your voice, in the key you choose. Tempo stays the same.",
+                    stringResource(R.string.backing_export_text),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -82,14 +84,14 @@ internal fun BackingExportSheet(dialog: BackingExportDialog, track: Track, actio
                 }
             } else if (dialog.options.instrumentalToCome) {
                 Text(
-                    "The instrumental can be exported once vocal removal is done; the original audio can now.",
+                    stringResource(R.string.backing_export_instrumental_later),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             ExportTransposeControl(dialog.transpose, track.lastTranspose, actions.onTranspose)
             Text(
-                "Saved as “${backingExportTitle(track, dialog.layer, dialog.transpose)}”",
+                stringResource(R.string.backing_export_saved_as, backingExportTitle(track, dialog.layer, dialog.transpose)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -103,8 +105,8 @@ internal fun BackingExportSheet(dialog: BackingExportDialog, track: Track, actio
 private fun ExportTransposeControl(transpose: Transpose, lastTranspose: Transpose, onChange: (Transpose) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Transpose", Modifier.weight(1f), style = rowLabel())
-            StepButton("−", "Transpose down", enabled = transpose.semitones > Transpose.MIN) { onChange(Transpose(transpose.semitones - 1)) }
+            Text(stringResource(R.string.session_transpose), Modifier.weight(1f), style = rowLabel())
+            StepButton("−", stringResource(R.string.session_transpose_down), enabled = transpose.semitones > Transpose.MIN) { onChange(Transpose(transpose.semitones - 1)) }
             Text(
                 transpose.label(),
                 Modifier.width(40.dp),
@@ -112,11 +114,11 @@ private fun ExportTransposeControl(transpose: Transpose, lastTranspose: Transpos
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center,
             )
-            StepButton("+", "Transpose up", enabled = transpose.semitones < Transpose.MAX) { onChange(Transpose(transpose.semitones + 1)) }
+            StepButton("+", stringResource(R.string.session_transpose_up), enabled = transpose.semitones < Transpose.MAX) { onChange(Transpose(transpose.semitones + 1)) }
         }
         if (transpose != lastTranspose) {
             Text(
-                "For this export only; you keep singing at ${lastTranspose.label()}.",
+                stringResource(R.string.backing_export_transpose_once, lastTranspose.label()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -124,7 +126,10 @@ private fun ExportTransposeControl(transpose: Transpose, lastTranspose: Transpos
     }
 }
 
-private fun BackingChoice.label(): String = when (this) {
-    BackingChoice.Instrumental -> "Instrumental"
-    BackingChoice.OriginalAudio -> "Original"
-}
+@Composable
+private fun BackingChoice.label(): String = stringResource(
+    when (this) {
+        BackingChoice.Instrumental -> R.string.backing_instrumental
+        BackingChoice.OriginalAudio -> R.string.backing_original_short
+    },
+)

@@ -54,6 +54,7 @@ AGP downloads the NDK and CMake automatically on first build. CMake fetches Sign
 ./gradlew assembleNetworkDebug assembleLocalDebug   # both flavors
 ./gradlew installNetworkDebug                       # install on a connected device
 ./gradlew test                                      # unit tests (domain core on the JVM)
+./gradlew :app:lintNetworkDebug                     # Lint, incl. untranslated or hardcoded UI text
 ```
 
 CI (GitHub Actions) runs the same build and tests on every push and pull request.

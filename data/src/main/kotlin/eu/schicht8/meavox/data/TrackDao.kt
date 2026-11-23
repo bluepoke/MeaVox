@@ -21,7 +21,8 @@ internal abstract class TrackDao {
     abstract fun observe(source: String, sourceTrackId: String): Flow<TrackEntity?>
 
     @Query(
-        "UPDATE tracks SET pipeline_state = :state, pipeline_progress = :progress, pipeline_failure = :failure " +
+        "UPDATE tracks SET pipeline_state = :state, pipeline_progress = :progress, pipeline_failure = :failure, " +
+            "pipeline_failure_kind = :failureKind, pipeline_failure_service = :failureService " +
             "WHERE source = :source AND source_track_id = :sourceTrackId",
     )
     protected abstract suspend fun setPipeline(
@@ -30,12 +31,22 @@ internal abstract class TrackDao {
         state: String,
         progress: String?,
         failure: String?,
+        failureKind: String?,
+        failureService: String?,
     ): Int
 
     /** Sets the pipeline columns of an existing row and returns the updated row. */
     @Transaction
     open suspend fun updatePipeline(source: String, sourceTrackId: String, pipeline: PipelineColumns): TrackEntity {
-        val updated = setPipeline(source, sourceTrackId, pipeline.state, pipeline.progress, pipeline.failure)
+        val updated = setPipeline(
+            source,
+            sourceTrackId,
+            pipeline.state,
+            pipeline.progress,
+            pipeline.failure.detail,
+            pipeline.failure.kind,
+            pipeline.failure.service,
+        )
         check(updated == 1) { "no Track $source:$sourceTrackId" }
         return checkNotNull(get(source, sourceTrackId))
     }

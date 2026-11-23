@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.newpipe
 
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.port.MediaUnavailable
 import eu.schicht8.meavox.core.port.ResolvedMedia
 import eu.schicht8.meavox.core.port.Source
 import eu.schicht8.meavox.core.port.SourceCandidate
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import org.schabi.newpipe.extractor.StreamingService
@@ -17,7 +20,6 @@ import org.schabi.newpipe.extractor.stream.ContentAvailability
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
-import java.io.IOException
 
 /**
  * One service behind NewPipeExtractor as a [Source] (ADR 1): its own [id] namespaces the Tracks
@@ -46,7 +48,7 @@ class NewPipeSource internal constructor(
     override suspend fun resolve(sourceTrackId: String): ResolvedMedia = extracting {
         val info = StreamInfo.getInfo(service, service.streamLHFactory.getUrl(sourceTrackId))
         val choice = AudioStreamChoice.best(info.audioStreams)
-            ?: throw MediaUnavailable("$name offers no audio that can be downloaded for this song", retryable = false)
+            ?: throw MediaUnavailable(FailureReason(FailureKind.NoDownloadableAudio, service = name), retryable = false)
         ResolvedMedia(audioUri = choice.stream.content, audioKey = choice.key, videoUri = null)
     }
 
@@ -56,13 +58,13 @@ class NewPipeSource internal constructor(
     } catch (e: MediaUnavailable) {
         throw e
     } catch (e: ContentNotAvailableException) {
-        throw MediaUnavailable(e.message ?: "$name says this song isn't available", retryable = false, e)
+        throw MediaUnavailable(FailureReason(FailureKind.TrackUnavailable, e.message, name), retryable = false, e)
     } catch (e: ReCaptchaException) {
-        throw MediaUnavailable("$name wants a CAPTCHA solved; try again later", retryable = true, e)
+        throw MediaUnavailable(FailureReason(FailureKind.CaptchaRequired, service = name), retryable = true, e)
     } catch (e: IOException) {
-        throw MediaUnavailable("$name can't be reached: ${e.message}", retryable = true, e)
+        throw MediaUnavailable(FailureReason(FailureKind.ServiceUnreachable, e.message, name), retryable = true, e)
     } catch (e: ExtractionException) {
-        throw MediaUnavailable("$name changed and MeaVox can't read it any more (${e.message}); an update may fix it", retryable = false, e)
+        throw MediaUnavailable(FailureReason(FailureKind.ServiceChanged, e.message, name), retryable = false, e)
     }
 
     private companion object {

@@ -3,6 +3,7 @@ package eu.schicht8.meavox.ui.session
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.export.BackingExportOptions
 import eu.schicht8.meavox.core.export.BackingExportUnavailable
 import eu.schicht8.meavox.core.export.ExportBacking
@@ -37,6 +38,8 @@ import eu.schicht8.meavox.core.session.SessionState
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.separating.ModelChoices
 import eu.schicht8.meavox.separating.ModelOption
+import eu.schicht8.meavox.ui.UiText
+import eu.schicht8.meavox.ui.text
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -166,13 +169,13 @@ class SessionViewModel(
     /** How much of the Backing Audio is prepared, 0..1, while the Session opens. */
     val loadProgress: StateFlow<Float> = _loadProgress
 
-    private val _openError = MutableStateFlow<String?>(null)
+    private val _openError = MutableStateFlow<UiText?>(null)
     /** Why the Session couldn't open, if it couldn't. */
-    val openError: StateFlow<String?> = _openError
+    val openError: StateFlow<UiText?> = _openError
 
-    private val _message = MutableStateFlow<String?>(null)
+    private val _message = MutableStateFlow<UiText?>(null)
     /** A one-off message for the user (shown once, then [messageShown]). */
-    val message: StateFlow<String?> = _message
+    val message: StateFlow<UiText?> = _message
 
     val state: StateFlow<SessionState> = from(SessionState.Idle) { it.state }
     val playback: StateFlow<Playback> = from(Playback.Idle) { it.playback }
@@ -195,7 +198,7 @@ class SessionViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _openError.value = e.message ?: e::class.simpleName
+                _openError.value = e.text()
             }
         }
     }
@@ -210,7 +213,7 @@ class SessionViewModel(
     fun onMicrophoneAllowed() = act { it.enableMicrophone() }
 
     fun onMicrophoneDenied() {
-        _message.value = "MeaVox needs access to the microphone to record a Take."
+        _message.value = UiText.of(R.string.session_microphone_denied)
     }
 
     fun messageShown() {
@@ -236,7 +239,7 @@ class SessionViewModel(
     fun recordAgain() = act { it.recordAgain() }
 
     fun playTake(take: TakeId) = act {
-        if (!it.play(take)) _message.value = "This Take can't be played."
+        if (!it.play(take)) _message.value = UiText.of(R.string.session_take_unplayable)
     }
 
     fun rename(take: TakeId, name: String) = act { it.rename(take, name) }
@@ -259,11 +262,11 @@ class SessionViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: MicrophoneUnavailable) {
-                _message.value = "The microphone can't be opened. Check that MeaVox may use it."
+                _message.value = UiText.of(R.string.session_microphone_unavailable)
             } catch (e: MixUnavailable) {
-                _message.value = e.reason
+                _message.value = e.text()
             } catch (e: Exception) {
-                _message.value = e.message ?: e::class.simpleName
+                _message.value = e.text()
             }
         }
     }
@@ -306,7 +309,7 @@ class SessionViewModel(
     fun chooseMixBacking(choice: BackingChoice) {
         val editor = _editor.value ?: return
         viewModelScope.launch {
-            if (!mixes.chooseBacking(editor.mix, choice)) _message.value = "The instrumental isn't ready yet."
+            if (!mixes.chooseBacking(editor.mix, choice)) _message.value = UiText.of(R.string.unavailable_instrumental_not_ready)
         }
     }
 
@@ -315,7 +318,7 @@ class SessionViewModel(
         val editor = _editor.value ?: return
         act {
             mixes.updateSettings(editor.mix, editor.settings)
-            if (!it.previewMix(editor.mix)) _message.value = "This Mix can't be played."
+            if (!it.previewMix(editor.mix)) _message.value = UiText.of(R.string.session_mix_unplayable)
         }
     }
 
@@ -336,9 +339,9 @@ class SessionViewModel(
                 updateExport(editor.mix, null)
                 throw e
             } catch (e: MixUnavailable) {
-                ExportProgress.Failed(e.reason)
+                ExportProgress.Failed(e.text())
             } catch (e: Exception) {
-                ExportProgress.Failed(e.message ?: e::class.simpleName.orEmpty())
+                ExportProgress.Failed(e.text())
             }
             updateExport(editor.mix, result)
         }
@@ -410,9 +413,9 @@ class SessionViewModel(
                 show(null)
                 throw e
             } catch (e: BackingExportUnavailable) {
-                ExportProgress.Failed(e.reason)
+                ExportProgress.Failed(e.text())
             } catch (e: Exception) {
-                ExportProgress.Failed(e.message ?: e::class.simpleName.orEmpty())
+                ExportProgress.Failed(e.text())
             }
             show(result)
         }
@@ -451,7 +454,7 @@ sealed interface ExportProgress {
 
     data class Done(val file: ExportedFile) : ExportProgress
 
-    data class Failed(val reason: String) : ExportProgress
+    data class Failed(val reason: UiText) : ExportProgress
 }
 
 /** The model picker on the Track screen (ADR 19): for re-separating, or for unmarking Vocal-Free. */

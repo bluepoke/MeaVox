@@ -61,6 +61,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -78,6 +80,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.export.ExportBacking
 import eu.schicht8.meavox.core.library.TrackRepository
 import eu.schicht8.meavox.core.lyrics.Lrc
@@ -112,15 +115,20 @@ import eu.schicht8.meavox.core.session.Session
 import eu.schicht8.meavox.core.session.SessionState
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.separating.ModelChoices
+import eu.schicht8.meavox.ui.UiText
 import eu.schicht8.meavox.ui.formatTime
 import eu.schicht8.meavox.ui.label
 import eu.schicht8.meavox.ui.lyrics.KaraokeView
 import eu.schicht8.meavox.ui.lyrics.PageView
 import eu.schicht8.meavox.ui.lyrics.details
 import eu.schicht8.meavox.ui.lyrics.name
+import eu.schicht8.meavox.ui.models.ConfirmAction
 import eu.schicht8.meavox.ui.models.DownloadNote
 import eu.schicht8.meavox.ui.models.ModelPicker
 import eu.schicht8.meavox.ui.models.confirmLabel
+import eu.schicht8.meavox.ui.percent
+import eu.schicht8.meavox.ui.resolve
+import eu.schicht8.meavox.ui.text
 import eu.schicht8.meavox.ui.theme.MeaVoxButtonShape
 import eu.schicht8.meavox.ui.theme.MeaVoxTheme
 import eu.schicht8.meavox.ui.verticalScrollbar
@@ -170,10 +178,11 @@ fun SessionRoute(
         if (backing != null && micAllowed()) viewModel.onMicrophoneAllowed()
     }
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val resources = LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(message) {
         message?.let {
-            snackbar.showSnackbar(it)
+            snackbar.showSnackbar(it.resolve(resources))
             viewModel.messageShown()
         }
     }
@@ -183,15 +192,14 @@ fun SessionRoute(
     confirmVocalFree?.let { bytes ->
         AlertDialog(
             onDismissRequest = { viewModel.confirmVocalFree(false) },
-            title = { Text("Mark as Vocal-Free?") },
+            title = { Text(stringResource(R.string.session_vocal_free_title)) },
             text = {
                 Text(
-                    "The instrumental and the vocal stem are deleted, freeing ${Formatter.formatShortFileSize(context, bytes)}. " +
-                        "You sing over the original audio from now on. Takes stay in sync.",
+                    stringResource(R.string.session_vocal_free_text, Formatter.formatShortFileSize(context, bytes)),
                 )
             },
-            confirmButton = { TextButton(onClick = { viewModel.confirmVocalFree(true) }, shape = MeaVoxButtonShape) { Text("Delete stems") } },
-            dismissButton = { TextButton(onClick = { viewModel.confirmVocalFree(false) }, shape = MeaVoxButtonShape) { Text("Cancel") } },
+            confirmButton = { TextButton(onClick = { viewModel.confirmVocalFree(true) }, shape = MeaVoxButtonShape) { Text(stringResource(R.string.session_delete_stems)) } },
+            dismissButton = { TextButton(onClick = { viewModel.confirmVocalFree(false) }, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -297,12 +305,12 @@ private fun ModelPickDialog(pick: ModelPick, track: Track?, onPick: (SeparationM
     val reseparate = pick.purpose == ModelPick.Purpose.Reseparate
     AlertDialog(
         onDismissRequest = { onConfirm(false) },
-        title = { Text(if (reseparate) "Remove the vocals again" else "Remove the vocals") },
+        title = { Text(stringResource(if (reseparate) R.string.session_reseparate_title else R.string.session_separate_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (reseparate) {
                     Text(
-                        "The original audio plays until the new instrumental is ready. Takes stay in sync.",
+                        stringResource(R.string.session_reseparate_text),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -315,9 +323,9 @@ private fun ModelPickDialog(pick: ModelPick, track: Track?, onPick: (SeparationM
                 onClick = { onConfirm(true) },
                 enabled = !(reseparate && pick.selected == current),
                 shape = MeaVoxButtonShape,
-            ) { Text(confirmLabel(if (reseparate) "re-separate" else "remove vocals", selected)) }
+            ) { Text(confirmLabel(if (reseparate) ConfirmAction.Reseparate else ConfirmAction.RemoveVocals, selected)) }
         },
-        dismissButton = { TextButton(onClick = { onConfirm(false) }, shape = MeaVoxButtonShape) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = { onConfirm(false) }, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -383,7 +391,7 @@ data class SessionActions(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionScreen(
-    openError: String?,
+    openError: UiText?,
     snackbar: SnackbarHostState,
     content: SessionContent,
     actions: SessionActions,
@@ -418,8 +426,8 @@ private fun LyricsPane(content: SessionContent, actions: SessionActions, modifie
     if (lines.isEmpty()) return PageView(content.lyrics, modifier)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            Choice("Karaoke", content.karaoke, index = 0, count = 2) { actions.onShowKaraoke(true) }
-            Choice("Page", !content.karaoke, index = 1, count = 2) { actions.onShowKaraoke(false) }
+            Choice(stringResource(R.string.session_view_karaoke), content.karaoke, index = 0, count = 2) { actions.onShowKaraoke(true) }
+            Choice(stringResource(R.string.session_view_page), !content.karaoke, index = 1, count = 2) { actions.onShowKaraoke(false) }
         }
         if (content.karaoke) {
             KaraokeView(
@@ -470,17 +478,17 @@ private fun TrackTitle(track: Track?) {
 
 /** The lower half, in the order of #34: status, Lyrics, Backing Audio, the Session, Vocal-Free. */
 @Composable
-private fun SessionControls(openError: String?, content: SessionContent, actions: SessionActions) {
+private fun SessionControls(openError: UiText?, content: SessionContent, actions: SessionActions) {
     val track = content.track ?: return LinearProgressIndicator(Modifier.fillMaxWidth())
     PipelineStatus(track.pipeline, actions.onRetry)
     VocalRemoval(track, content.modelName, actions.onReseparate)
     LyricsStatus(content.lyrics, actions.onConfirmLyrics, actions.onChooseLyrics)
     when {
-        openError != null -> Text("Can't play this Track: $openError", color = MaterialTheme.colorScheme.error)
+        openError != null -> Text(stringResource(R.string.session_cant_play, openError.resolve()), color = MaterialTheme.colorScheme.error)
         // Nothing to play until the Original Audio is stored; the Session opens by itself then (ADR 10).
         !track.hasOriginalAudio -> Unit
         content.backing == null -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Preparing audio… ${(content.loadProgress * 100).toInt()} %", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.session_preparing, percent(LocalResources.current, content.loadProgress)), style = MaterialTheme.typography.bodyMedium)
             LinearProgressIndicator(progress = { content.loadProgress }, modifier = Modifier.fillMaxWidth())
         }
         else -> {
@@ -490,7 +498,7 @@ private fun SessionControls(openError: String?, content: SessionContent, actions
             Transport(content.state, content.playback, content.reviewBackingDb, actions)
             TransposeControl(content.transpose, content.state, actions.onTranspose)
             Microphone(content.input, content.inputGainDb, actions.onGain)
-            SettingRow("Countdown before recording (${Session.COUNTDOWN_SECONDS} s)", content.countdownEnabled, actions.onCountdown)
+            SettingRow(stringResource(R.string.session_countdown, Session.COUNTDOWN_SECONDS), content.countdownEnabled, actions.onCountdown)
             Takes(content.takes, content.state, actions)
             MixesSection(content.mixes, content.takes, actions.onEditMix, actions.onDeleteMix)
         }
@@ -510,20 +518,20 @@ private fun BackingChoiceRow(track: Track, playing: BackingAudio, onChoose: (Bac
     val shown = if (available) track.backingChoice else BackingChoice.OriginalAudio
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Sing over", style = rowLabel())
+        Text(stringResource(R.string.session_sing_over), style = rowLabel())
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            Choice("Instrumental", shown == BackingChoice.Instrumental, index = 0, count = 2, enabled = available) {
+            Choice(stringResource(R.string.backing_instrumental), shown == BackingChoice.Instrumental, index = 0, count = 2, enabled = available) {
                 onChoose(BackingChoice.Instrumental)
             }
-            Choice("Original Audio", shown == BackingChoice.OriginalAudio, index = 1, count = 2) {
+            Choice(stringResource(R.string.backing_original), shown == BackingChoice.OriginalAudio, index = 1, count = 2) {
                 onChoose(BackingChoice.OriginalAudio)
             }
         }
         val playingShown = (playing is BackingAudio.Instrumental) == (shown == BackingChoice.Instrumental)
         when {
-            !available -> Text("The Instrumental can be chosen once vocal removal is done.", style = MaterialTheme.typography.bodySmall, color = muted)
+            !available -> Text(stringResource(R.string.session_instrumental_later), style = MaterialTheme.typography.bodySmall, color = muted)
             // Never under a Take being recorded, reviewed or played back (ADR 20).
-            !playingShown -> Text("Switches once this Take is done.", style = MaterialTheme.typography.bodySmall, color = muted)
+            !playingShown -> Text(stringResource(R.string.session_switches_after_take), style = MaterialTheme.typography.bodySmall, color = muted)
         }
     }
 }
@@ -543,12 +551,12 @@ private fun PipelineStatus(pipeline: TrackPipelineState, onRetry: () -> Unit) {
             }
         }
         is TrackPipelineState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("${pipeline.label()}: ${pipeline.reason}", color = MeaVoxTheme.colors.record, style = MaterialTheme.typography.bodyMedium)
-            NeutralOutlinedButton("Retry", onRetry, Modifier.height(44.dp))
+            Text(stringResource(R.string.session_pipeline_failed, pipeline.label(), pipeline.reason.text().resolve()), color = MeaVoxTheme.colors.record, style = MaterialTheme.typography.bodyMedium)
+            NeutralOutlinedButton(stringResource(R.string.action_retry), onRetry, Modifier.height(44.dp))
         }
         is TrackPipelineState.Downloading -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(pipeline.label(), style = MaterialTheme.typography.bodyMedium)
-            pipeline.retryReason?.let { Text("Last try: $it", style = MaterialTheme.typography.bodySmall, color = muted) }
+            pipeline.retryReason?.let { Text(stringResource(R.string.session_last_try, it.text().resolve()), style = MaterialTheme.typography.bodySmall, color = muted) }
             val progress = pipeline.progress
             if (progress == null) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -573,10 +581,10 @@ private fun VocalRemoval(track: Track, modelName: (SeparationModelId) -> String,
     val model = track.vocalRemovalModel
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Vocal removal", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.import_vocal_removal), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             model?.let { Text(modelName(it), style = rowLabel()) }
         }
-        NeutralOutlinedButton("Re-separate", onReseparate, Modifier.height(44.dp))
+        NeutralOutlinedButton(stringResource(R.string.confirm_reseparate), onReseparate, Modifier.height(44.dp))
     }
 }
 
@@ -586,34 +594,34 @@ private fun LyricsStatus(lyrics: TrackLyrics?, onConfirm: () -> Unit, onChoose: 
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val small = MaterialTheme.typography.bodySmall
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Lyrics", style = MaterialTheme.typography.labelLarge, color = muted)
+        Text(stringResource(R.string.session_lyrics), style = MaterialTheme.typography.labelLarge, color = muted)
         when (lyrics) {
             null, TrackLyrics.Searching -> {
                 // Waits for a network; the user needn't.
-                Text("Searching…", style = small, color = muted)
-                NeutralOutlinedButton("Search", onChoose, Modifier.height(44.dp))
+                Text(stringResource(R.string.session_searching), style = small, color = muted)
+                NeutralOutlinedButton(stringResource(R.string.action_search), onChoose, Modifier.height(44.dp))
             }
             is TrackLyrics.Suggested -> {
-                Text("Suggested: ${lyrics.lyrics.name()}", style = rowLabel())
+                Text(stringResource(R.string.session_lyrics_suggested, lyrics.lyrics.name()), style = rowLabel())
                 Text(lyrics.lyrics.details(), style = small, color = muted)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     // Gold text, not a gold surface: Keep is the screen's one gold surface.
-                    OutlinedButton(onClick = onConfirm, shape = MeaVoxButtonShape, modifier = Modifier.height(44.dp)) { Text("Confirm") }
-                    NeutralOutlinedButton("Choose another", onChoose, Modifier.height(44.dp))
+                    OutlinedButton(onClick = onConfirm, shape = MeaVoxButtonShape, modifier = Modifier.height(44.dp)) { Text(stringResource(R.string.action_confirm)) }
+                    NeutralOutlinedButton(stringResource(R.string.session_lyrics_choose_another), onChoose, Modifier.height(44.dp))
                 }
             }
             is TrackLyrics.Confirmed -> {
                 Text(lyrics.lyrics.name(), style = rowLabel())
                 Text(lyrics.lyrics.details(), style = small, color = muted)
-                NeutralOutlinedButton("Change", onChoose, Modifier.height(44.dp))
+                NeutralOutlinedButton(stringResource(R.string.action_change), onChoose, Modifier.height(44.dp))
             }
             is TrackLyrics.NotFound -> {
-                Text("No Lyrics found for \"${lyrics.query.title}\".", style = small, color = muted)
-                NeutralOutlinedButton("Search", onChoose, Modifier.height(44.dp))
+                Text(stringResource(R.string.session_lyrics_not_found, lyrics.query.title), style = small, color = muted)
+                NeutralOutlinedButton(stringResource(R.string.action_search), onChoose, Modifier.height(44.dp))
             }
             is TrackLyrics.Failed -> {
-                Text("Lyrics search failed: ${lyrics.reason}", style = small, color = MeaVoxTheme.colors.record)
-                NeutralOutlinedButton("Search", onChoose, Modifier.height(44.dp))
+                Text(stringResource(R.string.session_lyrics_failed, lyrics.reason.text().resolve()), style = small, color = MeaVoxTheme.colors.record)
+                NeutralOutlinedButton(stringResource(R.string.action_search), onChoose, Modifier.height(44.dp))
             }
         }
     }
@@ -624,9 +632,9 @@ private fun LyricsStatus(lyrics: TrackLyrics?, onConfirm: () -> Unit, onChoose: 
 private fun VocalFreeToggle(vocalFree: Boolean, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("No vocals (Vocal-Free)", style = rowLabel())
+            Text(stringResource(R.string.import_no_vocals), style = rowLabel())
             Text(
-                "For audio without a lead vocal, e.g. a karaoke version: vocal removal is skipped and you sing over the original audio.",
+                stringResource(R.string.session_vocal_free_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -674,13 +682,13 @@ private fun Transport(state: SessionState, playback: Playback, reviewBackingDb: 
     when (state) {
         SessionState.Idle -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NeutralOutlinedButton(
-                if (playback.playing) "Pause" else "Play",
+                stringResource(if (playback.playing) R.string.action_pause else R.string.action_play),
                 actions.onTogglePlay,
                 Modifier.height(TRANSPORT_HEIGHT),
                 style = transportLabel(),
                 horizontalPadding = 20.dp,
             )
-            RecordButton("Record from ${formatTime(playback.positionMs)}", actions.onRecord, Modifier.weight(1f))
+            RecordButton(stringResource(R.string.session_record_from, formatTime(playback.positionMs)), actions.onRecord, Modifier.weight(1f))
         }
         is SessionState.CountingDown -> Row(
             Modifier.fillMaxWidth().height(64.dp),
@@ -694,15 +702,15 @@ private fun Transport(state: SessionState, playback: Playback, reviewBackingDb: 
                 textAlign = TextAlign.Center,
                 modifier = Modifier.width(40.dp),
             )
-            Text("Recording from ${formatTime(state.startPositionMs)}…", style = rowLabel(), modifier = Modifier.weight(1f))
-            TextButton(onClick = actions.onStop, shape = MeaVoxButtonShape) { Text("Cancel") }
+            Text(stringResource(R.string.session_recording_from, formatTime(state.startPositionMs)), style = rowLabel(), modifier = Modifier.weight(1f))
+            TextButton(onClick = actions.onStop, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_cancel)) }
         }
         is SessionState.Recording -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             val record = MeaVoxTheme.colors.record
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Dot(record, CircleShape)
                 Text(
-                    "Recording · ${formatTime(playback.positionMs - state.startPositionMs)}",
+                    stringResource(R.string.session_recording, formatTime(playback.positionMs - state.startPositionMs)),
                     style = MeaVoxTheme.type.recordingTime,
                     color = record,
                 )
@@ -711,8 +719,8 @@ private fun Transport(state: SessionState, playback: Playback, reviewBackingDb: 
         }
         is SessionState.Review -> Review(state.take, state.transpose, playback, reviewBackingDb, actions)
         is SessionState.PlayingTake -> Panel(spacing = 12.dp) {
-            Text("Playing ${state.take.name}", style = MaterialTheme.typography.titleMedium)
-            NeutralOutlinedButton("Stop", actions.onStop, Modifier.height(44.dp))
+            Text(stringResource(R.string.session_playing_take, state.take.name), style = MaterialTheme.typography.titleMedium)
+            NeutralOutlinedButton(stringResource(R.string.action_stop), actions.onStop, Modifier.height(44.dp))
             ReviewBalance(reviewBackingDb, actions.onReviewBalance)
         }
         is SessionState.PreviewingMix -> PreviewingMixPanel(state, playback, actions.onStop)
@@ -731,8 +739,8 @@ private fun TransposeControl(transpose: Transpose, state: SessionState, onChange
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Transpose", Modifier.weight(1f), style = rowLabel())
-            StepButton("−", "Transpose down", enabled = transpose.semitones > Transpose.MIN) {
+            Text(stringResource(R.string.session_transpose), Modifier.weight(1f), style = rowLabel())
+            StepButton("−", stringResource(R.string.session_transpose_down), enabled = transpose.semitones > Transpose.MIN) {
                 onChange(Transpose(transpose.semitones - 1))
             }
             Text(
@@ -742,13 +750,13 @@ private fun TransposeControl(transpose: Transpose, state: SessionState, onChange
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center,
             )
-            StepButton("+", "Transpose up", enabled = transpose.semitones < Transpose.MAX) {
+            StepButton("+", stringResource(R.string.session_transpose_up), enabled = transpose.semitones < Transpose.MAX) {
                 onChange(Transpose(transpose.semitones + 1))
             }
         }
         if (takeTranspose != null && takeTranspose != transpose) {
             Text(
-                "This Take stays at ${takeTranspose.label()}; the new setting applies to the next Take.",
+                stringResource(R.string.session_transpose_next_take, takeTranspose.label()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -798,7 +806,7 @@ private fun StopButton(onClick: () -> Unit) {
     ) {
         Dot(colors.onRecord, RoundedCornerShape(2.dp))
         Spacer(Modifier.width(8.dp))
-        Text("Stop", style = transportLabel(), fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.action_stop), style = transportLabel(), fontWeight = FontWeight.Bold)
     }
 }
 
@@ -806,26 +814,26 @@ private fun StopButton(onClick: () -> Unit) {
 private fun Review(take: CapturedTake, transpose: Transpose, playback: Playback, reviewBackingDb: Float, actions: SessionActions) {
     Panel(spacing = 12.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Review", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.session_review), style = MaterialTheme.typography.titleLarge)
             Text(
-                "Take from ${formatTime(take.startPositionMs)}, ${formatTime(take.durationMs)} long, Transpose ${transpose.label()}",
+                stringResource(R.string.session_review_take, formatTime(take.startPositionMs), formatTime(take.durationMs), transpose.label()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (playback.playingTake) {
-                NeutralOutlinedButton("Pause", actions.onPause, Modifier.height(44.dp), horizontalPadding = 14.dp)
+                NeutralOutlinedButton(stringResource(R.string.action_pause), actions.onPause, Modifier.height(44.dp), horizontalPadding = 14.dp)
             } else {
-                NeutralOutlinedButton("Play again", actions.onReplay, Modifier.height(44.dp), horizontalPadding = 14.dp)
+                NeutralOutlinedButton(stringResource(R.string.session_play_again), actions.onReplay, Modifier.height(44.dp), horizontalPadding = 14.dp)
             }
             // Keep is the one gold surface on the screen.
             Button(onClick = actions.onKeep, shape = MeaVoxButtonShape, modifier = Modifier.weight(1f).height(44.dp)) {
-                Text("Keep", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.session_keep), fontWeight = FontWeight.Bold)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NeutralOutlinedButton("Discard", actions.onDiscard, Modifier.weight(1f).height(44.dp))
+            NeutralOutlinedButton(stringResource(R.string.session_discard), actions.onDiscard, Modifier.weight(1f).height(44.dp))
             val record = MeaVoxTheme.colors.record
             OutlinedButton(
                 onClick = actions.onRecordAgain,
@@ -833,7 +841,7 @@ private fun Review(take: CapturedTake, transpose: Transpose, playback: Playback,
                 border = BorderStroke(1.dp, record),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = record),
                 modifier = Modifier.weight(1f).height(44.dp),
-            ) { Text("Record again") }
+            ) { Text(stringResource(R.string.session_record_again)) }
         }
         ReviewBalance(reviewBackingDb, actions.onReviewBalance)
     }
@@ -847,12 +855,12 @@ private fun ReviewBalance(backingDb: Float, onChange: (Float) -> Unit) {
     val shown = dragDb ?: backingDb
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            "Backing while listening back: ${formatDb(shown)}",
+            stringResource(R.string.session_review_balance, formatDb(shown)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Voice", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.session_voice), style = MaterialTheme.typography.labelMedium)
             Slider(
                 value = shown,
                 onValueChange = {
@@ -864,7 +872,7 @@ private fun ReviewBalance(backingDb: Float, onChange: (Float) -> Unit) {
                 colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer),
                 modifier = Modifier.weight(1f),
             )
-            Text("Backing", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.session_backing), style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -874,13 +882,13 @@ private fun Microphone(input: InputLevel, gainDb: Float, onGain: (Float) -> Unit
     Panel(spacing = 10.dp) {
         if (!input.enabled) {
             Text(
-                "The microphone opens when you record for the first time.",
+                stringResource(R.string.session_microphone_later),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             return@Panel
         }
-        Text("Microphone (${input.device?.label() ?: "unknown"})", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.session_microphone, input.device?.label() ?: stringResource(R.string.device_unknown)), style = MaterialTheme.typography.labelLarge)
         LevelMeter(meterLevel(input.peak), input.clipping)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             for (mark in listOf("−60 dB", "−30", "0 dB")) {
@@ -889,7 +897,7 @@ private fun Microphone(input: InputLevel, gainDb: Float, onGain: (Float) -> Unit
         }
         if (input.clipping) {
             Text(
-                "Too loud: the input is clipping. Lower the gain or move back from the microphone.",
+                stringResource(R.string.session_clipping),
                 color = MeaVoxTheme.colors.record,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -898,7 +906,7 @@ private fun Microphone(input: InputLevel, gainDb: Float, onGain: (Float) -> Unit
         var dragDb by remember { mutableStateOf<Float?>(null) }
         val shown = dragDb ?: gainDb
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Input gain: ${formatDb(shown)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.session_input_gain, formatDb(shown)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Slider(
                 value = shown,
                 onValueChange = {
@@ -951,23 +959,23 @@ private fun Takes(takes: List<Take>, state: SessionState, actions: SessionAction
     var renaming by remember { mutableStateOf<Take?>(null) }
     var deleting by remember { mutableStateOf<Take?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Takes (${takes.size})", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.storage_takes, takes.size), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (takes.isEmpty()) {
-            Text("Kept Takes appear here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.session_takes_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         takes.forEach { take ->
             Panel(spacing = 6.dp, verticalPadding = 12.dp) {
                 Text(take.name, style = rowLabel())
                 Text(
-                    "From ${formatTime(take.startPositionMs)} · ${formatTime(take.durationMs)} · ${take.transpose.label()} · ${take.route.label()}",
+                    stringResource(R.string.session_take_details, formatTime(take.startPositionMs), formatTime(take.durationMs), take.transpose.label(), take.route.label()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(Modifier.offset(x = (-8).dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TakeAction("Play", MaterialTheme.colorScheme.primary, enabled = state == SessionState.Idle) { actions.onPlayTake(take.id) }
-                    TakeAction("New Mix", MaterialTheme.colorScheme.onSurface) { actions.onNewMix(take.id) }
-                    TakeAction("Rename", MaterialTheme.colorScheme.onSurface) { renaming = take }
-                    TakeAction("Delete", MaterialTheme.colorScheme.onSurface) { deleting = take }
+                    TakeAction(stringResource(R.string.action_play), MaterialTheme.colorScheme.primary, enabled = state == SessionState.Idle) { actions.onPlayTake(take.id) }
+                    TakeAction(stringResource(R.string.session_new_mix), MaterialTheme.colorScheme.onSurface) { actions.onNewMix(take.id) }
+                    TakeAction(stringResource(R.string.action_rename), MaterialTheme.colorScheme.onSurface) { renaming = take }
+                    TakeAction(stringResource(R.string.action_delete), MaterialTheme.colorScheme.onSurface) { deleting = take }
                 }
             }
         }
@@ -976,29 +984,29 @@ private fun Takes(takes: List<Take>, state: SessionState, actions: SessionAction
         var name by remember(take.id) { mutableStateOf(take.name) }
         AlertDialog(
             onDismissRequest = { renaming = null },
-            title = { Text("Rename Take") },
+            title = { Text(stringResource(R.string.session_rename_take)) },
             text = { OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true) },
             confirmButton = {
                 TextButton(onClick = {
                     actions.onRename(take.id, name)
                     renaming = null
-                }, shape = MeaVoxButtonShape) { Text("Rename") }
+                }, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_rename)) }
             },
-            dismissButton = { TextButton(onClick = { renaming = null }, shape = MeaVoxButtonShape) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { renaming = null }, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
     deleting?.let { take ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Delete ${take.name}?") },
-            text = { Text("The recording and its Mixes are removed for good. Exported files stay.") },
+            title = { Text(stringResource(R.string.storage_delete_take_title, take.name)) },
+            text = { Text(stringResource(R.string.session_delete_take_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     actions.onDelete(take.id)
                     deleting = null
-                }, shape = MeaVoxButtonShape) { Text("Delete") }
+                }, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_delete)) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }, shape = MeaVoxButtonShape) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deleting = null }, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -1079,21 +1087,27 @@ internal fun Transpose.label(): String = when {
     else -> "0"
 }
 
-private fun InputDevice.label(): String = when (this) {
-    InputDevice.BuiltIn -> "built-in"
-    InputDevice.Wired -> "headset"
-    InputDevice.Usb -> "USB"
-    InputDevice.Bluetooth -> "Bluetooth"
-    InputDevice.Other -> "other"
-}
+@Composable
+private fun InputDevice.label(): String = stringResource(
+    when (this) {
+        InputDevice.BuiltIn -> R.string.device_built_in
+        InputDevice.Wired -> R.string.device_headset
+        InputDevice.Usb -> R.string.device_usb
+        InputDevice.Bluetooth -> R.string.device_bluetooth
+        InputDevice.Other -> R.string.device_other
+    },
+)
 
-private fun OutputRoute.label(): String = when (this) {
-    OutputRoute.Speaker -> "speaker"
-    OutputRoute.Wired -> "wired"
-    OutputRoute.Usb -> "USB"
-    OutputRoute.Bluetooth -> "Bluetooth"
-    OutputRoute.Other -> "other output"
-}
+@Composable
+private fun OutputRoute.label(): String = stringResource(
+    when (this) {
+        OutputRoute.Speaker -> R.string.route_speaker
+        OutputRoute.Wired -> R.string.route_wired
+        OutputRoute.Usb -> R.string.device_usb
+        OutputRoute.Bluetooth -> R.string.device_bluetooth
+        OutputRoute.Other -> R.string.route_other
+    },
+)
 
 @Preview
 @Composable

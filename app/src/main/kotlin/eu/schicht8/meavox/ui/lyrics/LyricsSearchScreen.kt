@@ -24,6 +24,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,12 +34,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.lyrics.MatchLyrics
 import eu.schicht8.meavox.core.lyrics.pageText
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.port.LyricsCandidate
 import eu.schicht8.meavox.core.port.LyricsQuery
 import eu.schicht8.meavox.core.port.LyricsUnavailable
+import eu.schicht8.meavox.ui.UiText
+import eu.schicht8.meavox.ui.resolve
+import eu.schicht8.meavox.ui.text
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -54,8 +59,8 @@ class LyricsSearchViewModel(private val id: TrackId, private val match: MatchLyr
     val results: StateFlow<List<LyricsCandidate>?> = _results
     private val _searching = MutableStateFlow(false)
     val searching: StateFlow<Boolean> = _searching
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
+    private val _error = MutableStateFlow<UiText?>(null)
+    val error: StateFlow<UiText?> = _error
     private var duration: Long? = null
 
     init {
@@ -87,7 +92,7 @@ class LyricsSearchViewModel(private val id: TrackId, private val match: MatchLyr
             try {
                 _results.value = match.search(LyricsQuery(_artist.value.trim().ifEmpty { null }, title, duration))
             } catch (e: LyricsUnavailable) {
-                _error.value = e.message
+                _error.value = e.reason.text()
             } finally {
                 _searching.value = false
             }
@@ -126,26 +131,26 @@ fun LyricsSearchScreen(
     title: String,
     results: List<LyricsCandidate>?,
     searching: Boolean,
-    error: String?,
+    error: UiText?,
     onArtist: (String) -> Unit,
     onTitle: (String) -> Unit,
     onSearch: () -> Unit,
     onChoose: (LyricsCandidate) -> Unit,
 ) {
-    Scaffold(topBar = { TopAppBar(title = { Text("Choose Lyrics") }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.lyrics_search_title)) }) }) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val search = KeyboardActions(onSearch = { onSearch() })
             val options = KeyboardOptions(imeAction = ImeAction.Search)
-            OutlinedTextField(artist, onArtist, label = { Text("Artist") }, singleLine = true, keyboardOptions = options, keyboardActions = search, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(title, onTitle, label = { Text("Title") }, singleLine = true, keyboardOptions = options, keyboardActions = search, modifier = Modifier.fillMaxWidth())
-            Button(onClick = onSearch, enabled = title.isNotBlank() && !searching) { Text("Search") }
+            OutlinedTextField(artist, onArtist, label = { Text(stringResource(R.string.lyrics_search_artist)) }, singleLine = true, keyboardOptions = options, keyboardActions = search, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(title, onTitle, label = { Text(stringResource(R.string.lyrics_search_song_title)) }, singleLine = true, keyboardOptions = options, keyboardActions = search, modifier = Modifier.fillMaxWidth())
+            Button(onClick = onSearch, enabled = title.isNotBlank() && !searching) { Text(stringResource(R.string.action_search)) }
             when {
                 searching -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                error != null -> Text("Search failed: $error", color = MaterialTheme.colorScheme.error)
-                results?.isEmpty() == true -> Text("No Lyrics found. Try another spelling, or leave out the artist.")
+                error != null -> Text(stringResource(R.string.lyrics_search_failed, error.resolve()), color = MaterialTheme.colorScheme.error)
+                results?.isEmpty() == true -> Text(stringResource(R.string.lyrics_search_nothing_found))
             }
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(results.orEmpty(), key = { it.providerItemId }) { candidate ->

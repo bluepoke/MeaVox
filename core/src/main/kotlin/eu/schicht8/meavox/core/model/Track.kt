@@ -103,7 +103,7 @@ sealed interface TrackPipelineState {
      */
     data class Downloading(
         val progress: Float? = null,
-        val retryReason: String? = null,
+        val retryReason: FailureReason? = null,
         val failedAttempts: Int = 0,
     ) : TrackPipelineState
 
@@ -129,7 +129,7 @@ sealed interface TrackPipelineState {
     data class StemsDeleted(val model: SeparationModelId) : TrackPipelineState
 
     /** [step] stopped for a [reason] that retrying alone won't fix; the user can retry. */
-    data class Failed(val step: PipelineStep, val reason: String) : TrackPipelineState
+    data class Failed(val step: PipelineStep, val reason: FailureReason) : TrackPipelineState
 }
 
 /** A step of the Track Pipeline that can fail (ADR 10). */

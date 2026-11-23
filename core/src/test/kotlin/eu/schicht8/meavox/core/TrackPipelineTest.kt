@@ -5,6 +5,8 @@ import eu.schicht8.meavox.core.library.ImportLocalFile
 import eu.schicht8.meavox.core.library.Library
 import eu.schicht8.meavox.core.library.TrackRepository
 import eu.schicht8.meavox.core.mix.Mixes
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -27,6 +29,9 @@ import eu.schicht8.meavox.core.testing.InMemorySettingsRepository
 import eu.schicht8.meavox.core.testing.InMemoryTakeRepository
 import eu.schicht8.meavox.core.testing.InMemoryTrackFiles
 import eu.schicht8.meavox.core.testing.InMemoryTrackRepository
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -34,9 +39,6 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TrackPipelineTest {
@@ -110,7 +112,7 @@ class TrackPipelineTest {
         val ready = import(FakeLocalFile(displayName = "b.mp3", content = "audio-b"))
         tracks.updatePipeline(ready.id, TrackPipelineState.Ready(fast))
         val failed = import(FakeLocalFile(displayName = "c.mp3", content = "audio-c"))
-        tracks.updatePipeline(failed.id, TrackPipelineState.Failed(PipelineStep.Separating, "broken file"))
+        tracks.updatePipeline(failed.id, TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.AudioUndecodable)))
 
         startPipeline()
         // The running job reports progress, which changes the Track again.
@@ -118,7 +120,7 @@ class TrackPipelineTest {
 
         assertEquals(listOf(FakePipelineJobs.Separation(interrupted.id, best)), jobs.separations)
         assertEquals(TrackPipelineState.Ready(fast), tracks.get(ready.id)?.pipeline)
-        assertEquals(TrackPipelineState.Failed(PipelineStep.Separating, "broken file"), tracks.get(failed.id)?.pipeline)
+        assertEquals(TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.AudioUndecodable)), tracks.get(failed.id)?.pipeline)
     }
 
     @Test
@@ -126,7 +128,7 @@ class TrackPipelineTest {
         defaultModel.set(best)
         startPipeline()
         val track = import(FakeLocalFile(displayName = "song.mp3", content = "audio-1"))
-        tracks.updatePipeline(track.id, TrackPipelineState.Failed(PipelineStep.Separating, "out of memory"))
+        tracks.updatePipeline(track.id, TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.OutOfMemory)))
 
         pipeline.retry(track.id)
 
@@ -150,7 +152,7 @@ class TrackPipelineTest {
     fun `at start an interrupted download is queued again once, and a failed one can be retried`() = runTest {
         val interrupted = tracks.addIfAbsent(Track(TrackId(youtube, "a"), "A", null, null, TrackPipelineState.Downloading(0.4f)))
         val failed = tracks.addIfAbsent(
-            Track(TrackId(youtube, "b"), "B", null, null, TrackPipelineState.Failed(PipelineStep.Downloading, "connection lost")),
+            Track(TrackId(youtube, "b"), "B", null, null, TrackPipelineState.Failed(PipelineStep.Downloading, FailureReason(FailureKind.ConnectionBroke))),
         )
 
         startPipeline()
@@ -258,7 +260,7 @@ class TrackPipelineTest {
         val deleted = import(FakeLocalFile(displayName = "a.mp3", content = "audio-a"))
         tracks.updatePipeline(deleted.id, TrackPipelineState.StemsDeleted(fast))
         val failed = import(FakeLocalFile(displayName = "b.mp3", content = "audio-b"))
-        tracks.updatePipeline(failed.id, TrackPipelineState.Failed(PipelineStep.Separating, "out of memory"))
+        tracks.updatePipeline(failed.id, TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.OutOfMemory)))
 
         pipeline.reseparate(deleted.id, medium)
         pipeline.reseparate(failed.id, medium)
@@ -273,7 +275,7 @@ class TrackPipelineTest {
         val track = import(FakeLocalFile(displayName = "song.mp3", content = "audio-1"))
         tracks.updatePipeline(track.id, TrackPipelineState.Ready(fast))
         pipeline.reseparate(track.id, best)
-        tracks.updatePipeline(track.id, TrackPipelineState.Failed(PipelineStep.Separating, "out of memory"))
+        tracks.updatePipeline(track.id, TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.OutOfMemory)))
 
         pipeline.retry(track.id)
 

@@ -11,6 +11,8 @@ import androidx.room.Query
 import androidx.room.Upsert
 import eu.schicht8.meavox.core.lyrics.LyricsRepository
 import eu.schicht8.meavox.core.lyrics.TrackLyrics
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.port.LyricsCandidate
@@ -48,7 +50,12 @@ internal data class LyricsEntity(
     @ColumnInfo(name = "duration_ms") val durationMs: Long? = null,
     @ColumnInfo(name = "plain") val plain: String? = null,
     @ColumnInfo(name = "synced") val synced: String? = null,
+    /** The failure reason's detail since version 14, the whole reason as English text before (see [FailureColumns]). */
     @ColumnInfo(name = "failure") val failure: String? = null,
+    /** The kind of that reason as a stable code (version 14, #43); null for rows from before. */
+    @ColumnInfo(name = "failure_kind") val failureKind: String? = null,
+    /** The service the reason names, e.g. LRCLIB (version 14, #43). */
+    @ColumnInfo(name = "failure_service") val failureService: String? = null,
 ) {
     fun trackId() = TrackId(SourceId(source), sourceTrackId)
 }
@@ -60,7 +67,7 @@ internal fun TrackLyrics.toEntity(track: TrackId): LyricsEntity {
         is TrackLyrics.Suggested -> row.copy(status = SUGGESTED).withQuery(query).withLyrics(lyrics)
         is TrackLyrics.Confirmed -> row.copy(status = CONFIRMED).withLyrics(lyrics)
         is TrackLyrics.NotFound -> row.copy(status = NOT_FOUND).withQuery(query)
-        is TrackLyrics.Failed -> row.copy(status = FAILED, failure = reason)
+        is TrackLyrics.Failed -> reason.toColumns().let { row.copy(status = FAILED, failure = it.detail, failureKind = it.kind, failureService = it.service) }
     }
 }
 
@@ -69,7 +76,7 @@ internal fun LyricsEntity.toLyrics(): TrackLyrics = when (status) {
     SUGGESTED -> TrackLyrics.Suggested(lyrics(), query())
     CONFIRMED -> TrackLyrics.Confirmed(lyrics())
     NOT_FOUND -> TrackLyrics.NotFound(query())
-    FAILED -> TrackLyrics.Failed(failure.orEmpty())
+    FAILED -> TrackLyrics.Failed(FailureColumns(kind = failureKind, detail = failure, service = failureService).toReason() ?: FailureReason(FailureKind.Unexpected))
     else -> error("unknown lyrics status '$status'")
 }
 

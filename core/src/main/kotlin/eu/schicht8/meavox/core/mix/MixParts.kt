@@ -65,9 +65,9 @@ internal suspend fun resolveMix(
     takes: TakeRepository,
     files: TrackFiles,
 ): MixParts {
-    val mix = mixes.get(id) ?: throw MixUnavailable("This Mix was deleted.")
-    val track = tracks.get(mix.track) ?: throw MixUnavailable("This Track was deleted.")
-    val take = takes.get(mix.take) ?: throw MixUnavailable("This Mix's Take was deleted.")
+    val mix = mixes.get(id) ?: throw MixUnavailable(MixUnavailable.Why.MixDeleted)
+    val track = tracks.get(mix.track) ?: throw MixUnavailable(MixUnavailable.Why.TrackDeleted)
+    val take = takes.get(mix.take) ?: throw MixUnavailable(MixUnavailable.Why.TakeDeleted)
     val backing = when (val wanted = mix.backing) {
         // A Vocal-Free Track has no Instrumental (ADR 14); its Mixes were switched when it was marked.
         BackingAudio.OriginalAudio -> wanted
@@ -75,7 +75,7 @@ internal suspend fun resolveMix(
             track.vocalFree -> BackingAudio.OriginalAudio
             track.instrumentalModel == wanted.model || files.sizeOfStems(track.id, wanted.model) > 0 -> wanted
             else -> {
-                val current = track.instrumentalModel ?: throw MixUnavailable("The instrumental isn't ready yet.")
+                val current = track.instrumentalModel ?: throw MixUnavailable(MixUnavailable.Why.InstrumentalNotReady)
                 BackingAudio.Instrumental(current).also { mixes.update(mix.copy(backing = it)) }
             }
         }
@@ -83,5 +83,14 @@ internal suspend fun resolveMix(
     return MixParts(mix, track, take, backing)
 }
 
-/** A Mix can't be played or exported now, for [reason] (shown to the user). */
-class MixUnavailable(val reason: String) : IllegalStateException(reason)
+/** A Mix can't be played or exported now, because of [why]; the UI words it (#43). */
+class MixUnavailable(val why: Why) : IllegalStateException(why.name) {
+    enum class Why {
+        MixDeleted,
+        TrackDeleted,
+        TakeDeleted,
+
+        /** The Mix's Instrumental is gone and the Track has no other one yet (e.g. it is being made again). */
+        InstrumentalNotReady,
+    }
+}

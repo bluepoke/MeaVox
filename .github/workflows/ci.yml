@@ -26,7 +26,7 @@ jobs:
       # AGP installs the missing SDK platform, NDK and CMake on first use (licenses are
       # pre-accepted on GitHub's Ubuntu runners).
       - name: Build both flavors and run unit tests
-        run: ./gradlew assembleNetworkDebug assembleLocalDebug test --stacktrace
+        run: ./gradlew assembleNetworkDebug assembleLocalDebug test :app:lintNetworkDebug :app:lintLocalDebug --stacktrace
 
       - name: Upload test reports on failure
         if: failure()

@@ -2,6 +2,8 @@
 package eu.schicht8.meavox.data
 
 import eu.schicht8.meavox.core.model.BackingChoice
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -25,8 +27,8 @@ class TrackEntityTest {
             TrackPipelineState.Added,
             TrackPipelineState.Downloading(),
             TrackPipelineState.Downloading(0.42f),
-            TrackPipelineState.Downloading(0.42f, retryReason = "the connection broke", failedAttempts = 2),
-            TrackPipelineState.Downloading(null, retryReason = "no network", failedAttempts = 1),
+            TrackPipelineState.Downloading(0.42f, retryReason = FailureReason(FailureKind.ConnectionBroke, "reset by peer"), failedAttempts = 2),
+            TrackPipelineState.Downloading(null, retryReason = FailureReason(FailureKind.ServiceUnreachable, service = "YouTube"), failedAttempts = 1),
             TrackPipelineState.Downloaded,
             TrackPipelineState.Separating(model),
             TrackPipelineState.Separating(model, SeparationProgress(SeparationProgress.Stage.DownloadingModel, 0.25f)),
@@ -35,12 +37,39 @@ class TrackEntityTest {
             TrackPipelineState.Ready(model),
             TrackPipelineState.StemsDeleted(model),
             TrackPipelineState.Ready(model = null),
-            TrackPipelineState.Failed(PipelineStep.Separating, "no decoder for audio/x-weird"),
-            TrackPipelineState.Failed(PipelineStep.Downloading, "HTTP 404"),
+            TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.AudioUndecodable, "no decoder for audio/x-weird")),
+            TrackPipelineState.Failed(PipelineStep.Downloading, FailureReason(FailureKind.ServerError, "404")),
         )
         for (state in states) {
             assertEquals(track(state), track(state).toEntity(addedAt = 1).toTrack(), "$state")
         }
+    }
+
+    @Test
+    fun `every kind of failure reason is stored and read back, with its detail and service`() {
+        for (kind in FailureKind.entries) {
+            val reason = FailureReason(kind, detail = "detail of $kind", service = "YouTube")
+            val state = TrackPipelineState.Failed(PipelineStep.Downloading, reason)
+
+            assertEquals(track(state), track(state).toEntity(addedAt = 1).toTrack(), "$kind")
+        }
+    }
+
+    @Test
+    fun `a failure reason stored as text before #43 is shown as it was`() {
+        val earlier = track(TrackPipelineState.Ready(model)).toEntity(addedAt = 1)
+            .copy(pipelineState = "failed:downloading", pipelineFailure = "the server answered HTTP 404")
+        val waiting = track(TrackPipelineState.Ready(model)).toEntity(addedAt = 1)
+            .copy(pipelineState = "downloading", pipelineProgress = "downloading:0.5:1", pipelineFailure = "the download link expired")
+
+        assertEquals(
+            TrackPipelineState.Failed(PipelineStep.Downloading, FailureReason(FailureKind.Unexpected, "the server answered HTTP 404")),
+            earlier.toTrack().pipeline,
+        )
+        assertEquals(
+            TrackPipelineState.Downloading(0.5f, FailureReason(FailureKind.Unexpected, "the download link expired"), failedAttempts = 1),
+            waiting.toTrack().pipeline,
+        )
     }
 
     @Test

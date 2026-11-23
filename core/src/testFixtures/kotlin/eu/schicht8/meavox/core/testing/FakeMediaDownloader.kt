@@ -2,6 +2,8 @@
 package eu.schicht8.meavox.core.testing
 
 import eu.schicht8.meavox.core.model.AudioFile
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.port.MediaDownloader
 import eu.schicht8.meavox.core.port.MediaUnavailable
 
@@ -36,7 +38,7 @@ class FakeMediaDownloader(private val files: InMemoryTrackFiles) : MediaDownload
         failAfterBytes?.let { limit ->
             files.appendToPart(into, bytes.copyOfRange(done, maxOf(done, minOf(limit, bytes.size))))
             for (bytesDone in progressSteps.orEmpty()) onProgress(bytesDone, bytes.size.toLong())
-            throw MediaUnavailable("connection lost", retryable = true)
+            throw MediaUnavailable(FailureReason(FailureKind.ConnectionBroke), retryable = true)
         }
         files.appendToPart(into, bytes.copyOfRange(done, bytes.size))
         val total = bytes.size.toLong()

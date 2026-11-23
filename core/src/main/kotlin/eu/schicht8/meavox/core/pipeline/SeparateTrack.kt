@@ -3,6 +3,8 @@ package eu.schicht8.meavox.core.pipeline
 
 import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.library.TrackRepository
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.TrackId
@@ -10,6 +12,8 @@ import eu.schicht8.meavox.core.model.TrackPipelineState
 import eu.schicht8.meavox.core.port.SeparationFailed
 import eu.schicht8.meavox.core.port.SeparationProgress
 import eu.schicht8.meavox.core.port.Separator
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.floor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
@@ -18,8 +22,6 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.floor
 
 /**
  * The Separating step of the Track Pipeline (ADR 10, ADR 15). One instance serves every job of the
@@ -103,8 +105,9 @@ class SeparateTrack(
                 TrackPipelineState.Separating(model, progress.value) to Outcome.RetryLater
             else -> {
                 val reason = when (failure) {
-                    is OutOfMemoryError -> "out of memory"
-                    else -> failure.message ?: failure::class.simpleName ?: "unknown error"
+                    is OutOfMemoryError -> FailureReason(FailureKind.OutOfMemory)
+                    is SeparationFailed -> failure.reason
+                    else -> FailureReason.unexpected(failure)
                 }
                 TrackPipelineState.Failed(PipelineStep.Separating, reason) to Outcome.Failed
             }

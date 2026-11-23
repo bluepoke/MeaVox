@@ -8,6 +8,8 @@ import eu.schicht8.meavox.core.library.TrackUsage
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.Take
 import eu.schicht8.meavox.core.model.TrackId
+import eu.schicht8.meavox.ui.UiText
+import eu.schicht8.meavox.ui.text
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,10 +22,10 @@ class StorageViewModel(private val storage: TrackStorage) : ViewModel() {
     /** Every Track's usage, largest first; null while measuring for the first time. */
     val usage: StateFlow<List<TrackUsage>?> = _usage
 
-    private val _message = MutableStateFlow<String?>(null)
+    private val _message = MutableStateFlow<UiText?>(null)
 
     /** A one-off message for the user (shown once, then [messageShown]). */
-    val message: StateFlow<String?> = _message
+    val message: StateFlow<UiText?> = _message
 
     init {
         runAndMeasure {}
@@ -47,7 +49,7 @@ class StorageViewModel(private val storage: TrackStorage) : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _message.value = e.message ?: e::class.simpleName
+                _message.value = e.text()
             }
             _usage.value = storage.usage()
         }

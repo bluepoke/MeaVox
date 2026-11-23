@@ -3,6 +3,8 @@ package eu.schicht8.meavox.separation
 
 import eu.schicht8.meavox.core.model.AppDirectory
 import eu.schicht8.meavox.core.model.AudioFile
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.port.SeparationFailed
 import eu.schicht8.meavox.core.port.SeparationProgress
@@ -11,13 +13,13 @@ import eu.schicht8.meavox.core.port.Stems
 import eu.schicht8.meavox.separation.audio.FlacCodec
 import eu.schicht8.meavox.separation.audio.PcmDecoder
 import eu.schicht8.meavox.separation.audio.UndecodableAudio
+import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.io.File
-import java.io.IOException
 
 /**
  * [Separator] that runs the [catalogue]'s models on the device (ADR 3, ADR 15): the model is
@@ -41,7 +43,7 @@ class ModelSeparator(
         onProgress: (SeparationProgress) -> Unit,
     ) = oneAtATime.withLock {
         val entry = catalogue.firstOrNull { it.id == model }
-            ?: throw SeparationFailed("unknown Separation Model '${model.value}'", retryable = false)
+            ?: throw SeparationFailed(FailureReason(FailureKind.UnknownModel, model.value), retryable = false)
         val modelDir = try {
             runInterruptible(Dispatchers.IO) {
                 models.install(
@@ -51,9 +53,9 @@ class ModelSeparator(
                 )
             }
         } catch (e: ModelCorrupt) {
-            throw SeparationFailed(e.message ?: "model download corrupt", retryable = false, e)
+            throw SeparationFailed(FailureReason(FailureKind.ModelCorrupt, e.message), retryable = false, e)
         } catch (e: IOException) {
-            throw SeparationFailed("could not download ${entry.name}: ${e.message}", retryable = true, e)
+            throw SeparationFailed(FailureReason(FailureKind.ModelDownloadFailed, e.message), retryable = true, e)
         }
         try {
             runInterruptible(dispatcher) {
@@ -70,9 +72,9 @@ class ModelSeparator(
                 ).run()
             }
         } catch (e: UndecodableAudio) {
-            throw SeparationFailed(e.message ?: "the audio can't be decoded", retryable = false, e)
+            throw SeparationFailed(FailureReason(FailureKind.AudioUndecodable, e.message), retryable = false, e)
         } catch (e: IOException) {
-            throw SeparationFailed(e.message ?: "could not store the stems", retryable = false, e)
+            throw SeparationFailed(FailureReason(FailureKind.StemsNotStored, e.message), retryable = false, e)
         }
     }
 }

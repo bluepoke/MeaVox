@@ -17,8 +17,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.pipeline.NotificationPrompt
 import kotlinx.coroutines.launch
 
@@ -47,20 +49,18 @@ fun NotificationPermissionPrompt(prompt: NotificationPrompt) {
     AlertDialog(
         // Declining the explanation is an answer too: never asked again (#27).
         onDismissRequest = markAsked,
-        title = { Text("Show the progress?") },
+        title = { Text(stringResource(R.string.notifications_title)) },
         text = {
             Text(
-                "Removing the vocals runs in the background and takes a few minutes. " +
-                    "Allow notifications to follow it outside the app. " +
-                    "Without them it runs just the same, and the Library shows the progress.",
+                stringResource(R.string.notifications_text),
             )
         },
         confirmButton = {
             TextButton(onClick = {
                 requesting = true
                 request.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }) { Text("Allow") }
+            }) { Text(stringResource(R.string.notifications_allow)) }
         },
-        dismissButton = { TextButton(onClick = markAsked) { Text("Not now") } },
+        dismissButton = { TextButton(onClick = markAsked) { Text(stringResource(R.string.notifications_not_now)) } },
     )
 }

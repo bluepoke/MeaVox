@@ -33,27 +33,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.library.TrackStorage
 import eu.schicht8.meavox.core.library.TrackUsage
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.Take
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.model.TrackPipelineState
+import eu.schicht8.meavox.ui.resolve
 
 @Composable
 fun StorageRoute(storage: TrackStorage, modelNames: Map<SeparationModelId, String>) {
     val viewModel: StorageViewModel = viewModel(factory = viewModelFactory { initializer { StorageViewModel(storage) } })
     val usage by viewModel.usage.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val resources = LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(message) {
         message?.let {
-            snackbar.showSnackbar(it)
+            snackbar.showSnackbar(it.resolve(resources))
             viewModel.messageShown()
         }
     }
@@ -91,7 +97,7 @@ fun StorageScreen(
     var pending by remember { mutableStateOf<Deletion?>(null) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Storage") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.storage_title)) }) },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         if (usage == null) {
@@ -104,7 +110,7 @@ fun StorageScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Text("${size(usage.sumOf { it.totalBytes })} in ${usage.size} songs", style = MaterialTheme.typography.titleMedium)
+                Text(pluralStringResource(R.plurals.storage_total, usage.size, size(usage.sumOf { it.totalBytes }), usage.size), style = MaterialTheme.typography.titleMedium)
             }
             items(usage, key = { it.track.id.key }) { track ->
                 TrackUsageCard(track, modelNames, ::size, onDelete = { pending = it })
@@ -114,13 +120,12 @@ fun StorageScreen(
 
     pending?.let { deletion ->
         val (title, text) = when (deletion) {
-            is Deletion.Stems -> "Delete the stems of ${deletion.track.track.title}?" to
-                "Frees ${size(deletion.track.stemBytes[deletion.model] ?: 0)}. Vocals are removed again from the Original Audio " +
-                "when you next open the song, which takes a few minutes. Takes stay in sync."
-            is Deletion.OneTake -> "Delete ${deletion.take.name}?" to "The recording is removed for good."
-            is Deletion.WholeTrack -> "Delete ${deletion.track.track.title}?" to
-                "Frees ${size(deletion.track.totalBytes)}. The song, its ${deletion.track.takes.size} Takes and its Lyrics are " +
-                "removed for good."
+            is Deletion.Stems -> stringResource(R.string.storage_delete_stems_title, deletion.track.track.title) to
+                stringResource(R.string.storage_delete_stems_text, size(deletion.track.stemBytes[deletion.model] ?: 0))
+            is Deletion.OneTake -> stringResource(R.string.storage_delete_take_title, deletion.take.name) to
+                stringResource(R.string.storage_delete_take_text)
+            is Deletion.WholeTrack -> stringResource(R.string.storage_delete_track_title, deletion.track.track.title) to
+                pluralStringResource(R.plurals.storage_delete_track_text, deletion.track.takes.size, size(deletion.track.totalBytes), deletion.track.takes.size)
         }
         AlertDialog(
             onDismissRequest = { pending = null },
@@ -134,9 +139,9 @@ fun StorageScreen(
                         is Deletion.WholeTrack -> actions.onDeleteTrack(deletion.track.track.id)
                     }
                     pending = null
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.action_delete)) }
             },
-            dismissButton = { TextButton(onClick = { pending = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -154,21 +159,21 @@ private fun TrackUsageCard(
             Text(usage.track.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
             Text(size(usage.totalBytes), style = MaterialTheme.typography.titleSmall)
         }
-        UsageRow("Original Audio", size(usage.originalAudioBytes))
+        UsageRow(stringResource(R.string.storage_original_audio), size(usage.originalAudioBytes))
         usage.stemBytes.forEach { (model, bytes) ->
             // Stems still being written by Separation can't be deleted.
             val separating = (usage.track.pipeline as? TrackPipelineState.Separating)?.model == model
             UsageRow(
-                "Stems (${modelNames[model] ?: model.value})${if (separating) ", in progress" else ""}",
+                stringResource(if (separating) R.string.storage_stems_in_progress else R.string.storage_stems, modelNames[model] ?: model.value),
                 size(bytes),
                 onDelete = if (separating) null else ({ onDelete(Deletion.Stems(usage, model)) }),
             )
         }
-        if (usage.takes.isNotEmpty()) UsageRow("Takes (${usage.takes.size})", size(usage.takes.sumOf { it.bytes }))
+        if (usage.takes.isNotEmpty()) UsageRow(stringResource(R.string.storage_takes, usage.takes.size), size(usage.takes.sumOf { it.bytes }))
         usage.takes.forEach { take ->
             UsageRow("   ${take.take.name}", size(take.bytes), onDelete = { onDelete(Deletion.OneTake(take.take)) })
         }
-        OutlinedButton(onClick = { onDelete(Deletion.WholeTrack(usage)) }) { Text("Delete song") }
+        OutlinedButton(onClick = { onDelete(Deletion.WholeTrack(usage)) }) { Text(stringResource(R.string.storage_delete_track)) }
     }
 }
 
@@ -177,6 +182,6 @@ private fun UsageRow(label: String, size: String, onDelete: (() -> Unit)? = null
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Text(size, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (onDelete != null) TextButton(onClick = onDelete) { Text("Delete") }
+        if (onDelete != null) TextButton(onClick = onDelete) { Text(stringResource(R.string.action_delete)) }
     }
 }

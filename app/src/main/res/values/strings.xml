@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <!-- Stands in for a service's name (YouTube, LRCLIB) when it isn't known. -->
+    <string name="failure_service_fallback">The service</string>
+    <!-- A failure reason, then the error's own message as it came. -->
+    <string name="failure_with_detail">%1$s (%2$s)</string>
+    <string name="failure_source_not_in_app">This version of MeaVox can\'t download from “%1$s”.</string>
+    <string name="failure_no_downloadable_audio">%1$s offers no audio for this song that can be downloaded.</string>
+    <string name="failure_track_unavailable">%1$s says this song isn\'t available.</string>
+    <string name="failure_captcha_required">%1$s wants a CAPTCHA solved. Try again later.</string>
+    <string name="failure_service_unreachable">%1$s can\'t be reached.</string>
+    <string name="failure_service_changed">%1$s has changed, and MeaVox can\'t read it any more. An update may fix it.</string>
+    <string name="failure_no_data">The server sent no data.</string>
+    <string name="failure_link_expired">The download link expired.</string>
+    <!-- %1$s is an HTTP status code, e.g. 404. -->
+    <string name="failure_server_error">The server answered with error %1$s.</string>
+    <!-- %1$s is a service (LRCLIB), %2$s an HTTP status code. -->
+    <string name="failure_service_error">%1$s answered with error %2$s.</string>
+    <string name="failure_server_busy">The server is busy (error %1$s). Try again later.</string>
+    <string name="failure_service_busy">%1$s is busy (error %2$s). Try again later.</string>
+    <string name="failure_connection_broke">The connection broke off.</string>
+    <string name="failure_download_incomplete">The download ended before all of it arrived.</string>
+    <string name="failure_unknown_model">MeaVox doesn\'t know the vocal removal model “%1$s”.</string>
+    <string name="failure_model_corrupt">The downloaded model is damaged.</string>
+    <string name="failure_model_download_failed">The model could not be downloaded.</string>
+    <string name="failure_audio_undecodable">The song\'s audio can\'t be decoded.</string>
+    <string name="failure_stems_not_stored">The instrumental and the vocals could not be stored.</string>
+    <string name="failure_out_of_memory">The device ran out of memory.</string>
+    <string name="failure_answer_unreadable">%1$s sent an answer that can\'t be read.</string>
+    <string name="failure_unexpected">Something went wrong.</string>
+    <string name="unavailable_mix_deleted">This Mix was deleted.</string>
+    <string name="unavailable_track_deleted">This song was deleted.</string>
+    <string name="unavailable_take_deleted">This Mix\'s Take was deleted.</string>
+    <string name="unavailable_instrumental_not_ready">The instrumental isn\'t ready yet.</string>
+    <string name="unavailable_not_downloaded">The song isn\'t downloaded yet.</string>
+    <string name="session_microphone_denied">MeaVox needs access to the microphone to record a Take.</string>
+    <string name="session_take_unplayable">This Take can\'t be played.</string>
+    <string name="session_microphone_unavailable">The microphone can\'t be opened. Check that MeaVox may use it.</string>
+    <string name="session_mix_unplayable">This Mix can\'t be played.</string>
+    <!-- A service's name (YouTube), then why its search failed. -->
+    <string name="search_failed_at">%1$s: %2$s</string>
+    <string name="link_unsupported">MeaVox can\'t add songs from this link.</string>
+    <string name="link_failed">Can\'t add the song: %1$s</string>
+    <string name="link_cant_open">The link can\'t be opened.</string>
+    <string name="link_cant_add">The song can\'t be added.</string>
+    <string name="import_failed">Import failed: %1$s</string>
+    <!-- A percentage, e.g. 42 %. -->
+    <string name="percent">%1$d %%</string>
+    <string name="pipeline_added">Added</string>
+    <string name="pipeline_download_paused">Download paused, retrying soon</string>
+    <!-- %1$s is a percentage. -->
+    <string name="pipeline_downloading">Downloading %1$s</string>
+    <string name="pipeline_waiting_to_download">Waiting to download</string>
+    <string name="pipeline_downloaded">Downloaded</string>
+    <string name="pipeline_waiting_to_separate">Waiting to remove vocals</string>
+    <string name="pipeline_downloading_model">Downloading model %1$s</string>
+    <string name="pipeline_installing_model">Installing model %1$s</string>
+    <string name="pipeline_separating">Removing vocals %1$s</string>
+    <string name="pipeline_ready">Ready</string>
+    <string name="pipeline_stems_deleted">Stems deleted</string>
+    <string name="pipeline_download_failed">Download failed</string>
+    <string name="pipeline_separation_failed">Vocal removal failed</string>
+    <string name="track_vocal_free">Vocal-Free</string>
+    <string name="notification_channel_downloads">Downloads</string>
+    <string name="notification_downloading_title">Downloading</string>
+    <string name="notification_waiting_to_download">Waiting to download…</string>
+    <string name="notification_downloading">Downloading… %1$s</string>
+    <string name="notification_channel_separation">Vocal removal</string>
+    <string name="notification_separation_title">Removing vocals</string>
+    <string name="notification_downloading_model">Downloading the vocal removal model…</string>
+    <string name="notification_installing_model">Installing the vocal removal model… %1$s</string>
+    <string name="notification_separating">Removing vocals… %1$s</string>
+    <string name="notification_waiting_to_separate">Waiting to remove vocals…</string>
+    <string name="lyrics_search_title">Choose Lyrics</string>
+    <string name="lyrics_search_artist">Artist</string>
+    <string name="lyrics_search_song_title">Title</string>
+    <string name="lyrics_search_failed">Search failed: %1$s</string>
+    <string name="lyrics_search_nothing_found">No Lyrics found. Try another spelling, or leave out the artist.</string>
+    <string name="action_search">Search</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_play">Play</string>
+    <string name="action_pause">Pause</string>
+    <string name="search_title">Search songs</string>
+    <string name="search_query">Artist and title</string>
+    <string name="search_nothing_found">Nothing found. Try other words or another Source.</string>
+    <string name="search_preview_unplayable">The preview can\'t be played.</string>
+    <string name="storage_title">Storage</string>
+    <!-- %1$s is a size (12 MB), %2$d the number of songs. -->
+    <plurals name="storage_total">
+        <item quantity="one">%1$s in %2$d song</item>
+        <item quantity="other">%1$s in %2$d songs</item>
+    </plurals>
+    <string name="storage_delete_stems_title">Delete the stems of %1$s?</string>
+    <string name="storage_delete_stems_text">Frees %1$s. Vocals are removed again from the Original Audio when you next open the song, which takes a few minutes. Takes stay in sync.</string>
+    <string name="storage_delete_take_title">Delete %1$s?</string>
+    <string name="storage_delete_take_text">The recording is removed for good.</string>
+    <string name="storage_delete_track_title">Delete %1$s?</string>
+    <plurals name="storage_delete_track_text">
+        <item quantity="one">Frees %1$s. The song, its %2$d Take and its Lyrics are removed for good.</item>
+        <item quantity="other">Frees %1$s. The song, its %2$d Takes and its Lyrics are removed for good.</item>
+    </plurals>
+    <string name="storage_original_audio">Original Audio</string>
+    <!-- %1$s is a vocal removal model's name. -->
+    <string name="storage_stems">Stems (%1$s)</string>
+    <string name="storage_stems_in_progress">Stems (%1$s), in progress</string>
+    <string name="storage_takes">Takes (%1$d)</string>
+    <string name="storage_delete_track">Delete song</string>
+    <string name="model_fast">Fast</string>
+    <string name="model_medium">Medium</string>
+    <string name="model_best">Best</string>
+    <string name="model_current">%1$s (current)</string>
+    <string name="model_keeps_backing_vocals">keeps backing vocals</string>
+    <string name="model_removes_backing_vocals">removes backing vocals too</string>
+    <string name="model_download_size">%1$s download</string>
+    <string name="model_download_note">%1$s is downloaded once (%2$s) before vocal removal starts.</string>
+    <string name="confirm_add">Add</string>
+    <string name="confirm_download_and_add">Download %1$s and add</string>
+    <string name="confirm_reseparate">Re-separate</string>
+    <string name="confirm_download_and_reseparate">Download %1$s and re-separate</string>
+    <string name="confirm_remove_vocals">Remove vocals</string>
+    <string name="confirm_download_and_remove_vocals">Download %1$s and remove vocals</string>
+    <string name="model_faster_than_song">faster than the song plays</string>
+    <string name="model_times_song_length">about %1$s× the song\'s length</string>
+    <string name="model_under_a_minute">under a minute for this song</string>
+    <string name="model_about_minutes">about %1$d min for this song</string>
+    <string name="import_no_vocals">No vocals (Vocal-Free)</string>
+    <string name="import_no_vocals_hint">E.g. a karaoke version: vocal removal is skipped.</string>
+    <string name="import_vocal_removal">Vocal removal</string>
+    <string name="library_title">Library</string>
+    <string name="settings_title">Settings</string>
+    <string name="library_import_file">Import file</string>
+    <string name="library_empty">No songs yet</string>
+    <string name="library_empty_hint">Import an audio or video file, or share one to MeaVox from another app.</string>
+    <string name="action_rename">Rename</string>
+    <string name="library_rename_title">Rename song</string>
+    <string name="library_no_takes">No Takes</string>
+    <plurals name="library_takes">
+        <item quantity="one">%1$d Take</item>
+        <item quantity="other">%1$d Takes</item>
+    </plurals>
+    <string name="library_not_sung">Not sung yet</string>
+    <!-- %1$s is a relative time from the system, e.g. 3 days ago. -->
+    <string name="library_sung">Sung %1$s</string>
+    <string name="settings_default_model">Default vocal removal</string>
+    <string name="settings_default_model_hint">Pre-selected when you add a song or re-separate one; you can pick another there. Changing it doesn\'t touch songs already added. A model is downloaded the first time it is used.</string>
+    <string name="settings_your_name">Your name</string>
+    <string name="settings_your_name_hint">Exported Mixes name you as the singer next to the artist: “&lt;artist&gt; feat. &lt;your name&gt;”.</string>
+    <string name="settings_name">Name</string>
+    <string name="notifications_title">Show the progress?</string>
+    <string name="notifications_text">Removing the vocals runs in the background and takes a few minutes. Allow notifications to follow it outside the app. Without them it runs just the same, and the Library shows the progress.</string>
+    <string name="notifications_allow">Allow</string>
+    <string name="notifications_not_now">Not now</string>
+    <string name="lyrics_synced">Synced</string>
+    <string name="lyrics_plain">Plain</string>
+    <string name="lyrics_searching">Searching Lyrics…</string>
+    <string name="lyrics_none_yet">No Lyrics for this song yet. Search for them on the song\'s page.</string>
+    <!-- %1$s is "Artist – Title", %2$s Synced or Plain. -->
+    <string name="lyrics_suggested_source">Suggested: %1$s (%2$s)</string>
+    <string name="lyrics_source">%1$s (%2$s)</string>
+    <string name="lyrics_offset">Offset %1$s</string>
+    <string name="action_reset">Reset</string>
+    <string name="session_vocal_free_title">Mark as Vocal-Free?</string>
+    <string name="session_vocal_free_text">The instrumental and the vocal stem are deleted, freeing %1$s. You sing over the original audio from now on. Takes stay in sync.</string>
+    <string name="session_delete_stems">Delete stems</string>
+    <string name="session_reseparate_title">Remove the vocals again</string>
+    <string name="session_separate_title">Remove the vocals</string>
+    <string name="session_reseparate_text">The original audio plays until the new instrumental is ready. Takes stay in sync.</string>
+    <string name="session_view_karaoke">Karaoke</string>
+    <string name="session_view_page">Page</string>
+    <string name="session_cant_play">Can\'t play this song: %1$s</string>
+    <string name="session_preparing">Preparing audio… %1$s</string>
+    <string name="session_countdown">Countdown before recording (%1$d s)</string>
+    <string name="session_sing_over">Sing over</string>
+    <string name="backing_instrumental">Instrumental</string>
+    <string name="backing_original">Original Audio</string>
+    <string name="session_instrumental_later">The Instrumental can be chosen once vocal removal is done.</string>
+    <string name="session_switches_after_take">Switches once this Take is done.</string>
+    <!-- %1$s is what failed (Download failed), %2$s why. -->
+    <string name="session_pipeline_failed">%1$s: %2$s</string>
+    <string name="action_retry">Retry</string>
+    <string name="session_last_try">Last try: %1$s</string>
+    <string name="session_lyrics">Lyrics</string>
+    <string name="session_searching">Searching…</string>
+    <string name="session_lyrics_suggested">Suggested: %1$s</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="session_lyrics_choose_another">Choose another</string>
+    <string name="action_change">Change</string>
+    <string name="session_lyrics_not_found">No Lyrics found for “%1$s”.</string>
+    <string name="session_lyrics_failed">Lyrics search failed: %1$s</string>
+    <string name="session_vocal_free_hint">For audio without a lead vocal, e.g. a karaoke version: vocal removal is skipped and you sing over the original audio.</string>
+    <string name="session_record_from">Record from %1$s</string>
+    <string name="session_recording_from">Recording from %1$s…</string>
+    <string name="session_recording">Recording · %1$s</string>
+    <string name="session_playing_take">Playing %1$s</string>
+    <string name="action_stop">Stop</string>
+    <string name="session_transpose">Transpose</string>
+    <string name="session_transpose_down">Transpose down</string>
+    <string name="session_transpose_up">Transpose up</string>
+    <string name="session_transpose_next_take">This Take stays at %1$s; the new setting applies to the next Take.</string>
+    <string name="session_review">Review</string>
+    <string name="session_review_take">Take from %1$s, %2$s long, Transpose %3$s</string>
+    <string name="session_play_again">Play again</string>
+    <string name="session_keep">Keep</string>
+    <string name="session_discard">Discard</string>
+    <string name="session_record_again">Record again</string>
+    <string name="session_review_balance">Backing while listening back: %1$s</string>
+    <string name="session_voice">Voice</string>
+    <string name="session_backing">Backing</string>
+    <string name="session_microphone_later">The microphone opens when you record for the first time.</string>
+    <string name="session_microphone">Microphone (%1$s)</string>
+    <string name="device_unknown">unknown</string>
+    <string name="session_clipping">Too loud: the input is clipping. Lower the gain or move back from the microphone.</string>
+    <string name="session_input_gain">Input gain: %1$s</string>
+    <string name="session_takes_empty">Kept Takes appear here.</string>
+    <!-- Start, length, Transpose, and the output it was recorded on. -->
+    <string name="session_take_details">From %1$s · %2$s · %3$s · %4$s</string>
+    <string name="session_new_mix">New Mix</string>
+    <string name="session_rename_take">Rename Take</string>
+    <string name="session_delete_take_text">The recording and its Mixes are removed for good. Exported files stay.</string>
+    <string name="device_built_in">built-in</string>
+    <string name="device_headset">headset</string>
+    <string name="device_usb">USB</string>
+    <string name="device_bluetooth">Bluetooth</string>
+    <string name="device_other">other</string>
+    <string name="route_speaker">speaker</string>
+    <string name="route_wired">wired</string>
+    <string name="route_other">other output</string>
+    <string name="mix_list">Mixes (%1$d)</string>
+    <string name="mix_list_empty">Keeping a Take makes a Mix to export.</string>
+    <string name="mix_take">Take</string>
+    <string name="mix_edit_and_export">Edit &amp; export</string>
+    <string name="mix_delete_text">Its Take and any exported files stay.</string>
+    <string name="mix_previewing">Previewing %1$s</string>
+    <string name="mix_position">%1$s of %2$s</string>
+    <string name="mix_take_details">%1$s · from %2$s · %3$s · Transpose %4$s</string>
+    <string name="mix_vocal">Vocal</string>
+    <string name="mix_preview">Preview</string>
+    <string name="mix_preview_later">The preview can play once the Session is idle.</string>
+    <string name="mix_backing_audio">Backing Audio</string>
+    <string name="backing_original_short">Original</string>
+    <string name="mix_vocal_nudge">Vocal Nudge</string>
+    <string name="mix_vocal_earlier">Vocal earlier</string>
+    <string name="mix_vocal_later">Vocal later</string>
+    <string name="mix_vocal_nudge_hint">Moves your voice against the backing if it sounds early or late.</string>
+    <string name="export">Export</string>
+    <string name="export_running">Exporting… %1$s</string>
+    <string name="format_mp3" translatable="false">MP3</string>
+    <string name="format_m4a" translatable="false">M4A</string>
+    <string name="format_wav" translatable="false">WAV</string>
+    <string name="format_mp3_vbr_v2" translatable="false">VBR V2</string>
+    <string name="format_mp3_cbr_320" translatable="false">320 kbps</string>
+    <string name="format_wav_16">16-bit</string>
+    <string name="format_wav_24">24-bit</string>
+    <string name="format_mp3_hint">Plays everywhere. VBR V2 sounds as good as 320 kbps to most ears, in a smaller file.</string>
+    <string name="format_m4a_hint">AAC at 256 kbps: smaller than MP3 at the same quality.</string>
+    <string name="format_wav_hint">Lossless, for editing further. Large.</string>
+    <string name="export_saved_to">Saved to %1$s</string>
+    <string name="export_share">Share</string>
+    <string name="export_failed">Export failed: %1$s</string>
+    <string name="mix_settings_summary">Backing %1$s · Vocal %2$s · Nudge %3$s</string>
+    <string name="backing_export_row">Backing track</string>
+    <string name="backing_export_row_hint">Export the backing alone, in your key, e.g. for a live performance.</string>
+    <string name="backing_export_title">Export backing track</string>
+    <string name="backing_export_text">The whole song without your voice, in the key you choose. Tempo stays the same.</string>
+    <string name="backing_export_instrumental_later">The instrumental can be exported once vocal removal is done; the original audio can now.</string>
+    <!-- %1$s is the file's title, which stays English: Title (Instrumental, +2). -->
+    <string name="backing_export_saved_as">Saved as “%1$s”</string>
+    <string name="backing_export_transpose_once">For this export only; you keep singing at %1$s.</string>
+</resources>

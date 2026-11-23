@@ -5,6 +5,8 @@ import eu.schicht8.meavox.core.mix.Mix
 import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.MixSettings
 import eu.schicht8.meavox.core.mix.Mixes
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -27,14 +29,14 @@ import eu.schicht8.meavox.core.testing.InMemorySettingsRepository
 import eu.schicht8.meavox.core.testing.InMemoryTakeRepository
 import eu.schicht8.meavox.core.testing.InMemoryTrackFiles
 import eu.schicht8.meavox.core.testing.InMemoryTrackRepository
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class VocalFreeTest {
@@ -68,7 +70,7 @@ class VocalFreeTest {
 
     @Test
     fun `marking a Track whose Separation failed makes it Ready and drops what the Separation left`() = runTest {
-        addTrack(TrackPipelineState.Failed(PipelineStep.Separating, "out of memory"))
+        addTrack(TrackPipelineState.Failed(PipelineStep.Separating, FailureReason(FailureKind.OutOfMemory)))
         files.store(files.separationCheckpoint(id, FAST), 20_000_000)
 
         vocalFree.mark(id)

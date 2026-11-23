@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.lyrics
 
+import eu.schicht8.meavox.core.model.FailureKind
+import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.port.LyricsQuery
 import eu.schicht8.meavox.core.port.LyricsUnavailable
-import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import java.net.URI
 import java.net.URLDecoder
@@ -12,6 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 /** LRCLIB contract, against responses recorded from lrclib.net (`src/test/resources/lrclib/`). */
 class LrclibProviderTest {
@@ -77,5 +79,9 @@ class LrclibProviderTest {
 
         assertTrue(offline.retryable && busy.retryable && limited.retryable)
         assertFalse(refused.retryable)
+        assertEquals(FailureReason(FailureKind.ServiceUnreachable, "no route", "LRCLIB"), offline.reason)
+        assertEquals(FailureReason(FailureKind.ServerBusy, "503", "LRCLIB"), busy.reason)
+        assertEquals(FailureReason(FailureKind.ServerBusy, "429", "LRCLIB"), limited.reason)
+        assertEquals(FailureReason(FailureKind.ServerError, "400", "LRCLIB"), refused.reason)
     }
 }
