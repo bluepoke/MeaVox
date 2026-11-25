@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.data
 
-import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
-import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -28,12 +25,7 @@ import java.io.File
 @Config(sdk = [35])
 class MigrationTest(private val from: Int) {
     @get:Rule
-    val helper = MigrationTestHelper(
-        InstrumentationRegistry.getInstrumentation(),
-        MeaVoxDatabase::class.java,
-        emptyList(),
-        FrameworkSQLiteOpenHelperFactory(),
-    )
+    val helper = migrationTestHelper()
 
     @Test
     fun migratesToTheNextVersionKeepingEveryRow() {
@@ -118,20 +110,12 @@ class MigrationTest(private val from: Int) {
 
     companion object {
         private const val DATABASE_NAME = "migration-test"
-        private val SCHEMAS = File("schemas/${MeaVoxDatabase::class.java.name}")
-
-        private fun schema(version: Int) = JSONObject(File(SCHEMAS, "$version.json").readText())
+        private fun schema(version: Int) = JSONObject(File(EXPORTED_SCHEMAS, "$version.json").readText())
 
         /** Every exported version but the last: each is migrated to the next. */
         @JvmStatic
         @ParameterizedRobolectricTestRunner.Parameters(name = "{0} → next")
-        fun versions(): List<Array<Any>> {
-            // Gradle runs unit tests in the module's directory.
-            check(SCHEMAS.isDirectory) { "no exported schemas in ${SCHEMAS.absolutePath}" }
-            val versions = SCHEMAS.listFiles().orEmpty().mapNotNull { it.nameWithoutExtension.toIntOrNull() }.sorted()
-            check(versions.size > 1 && versions == (1..versions.last()).toList()) { "a schema is missing among $versions" }
-            return versions.dropLast(1).map { arrayOf(it) }
-        }
+        fun versions(): List<Array<Any>> = exportedVersions().dropLast(1).map { arrayOf(it) }
 
         /**
          * Real values for the app's columns, consistent across tables: the Track `youtube:abc` with
