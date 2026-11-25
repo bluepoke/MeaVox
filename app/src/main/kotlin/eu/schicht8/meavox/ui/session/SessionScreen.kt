@@ -263,6 +263,7 @@ fun SessionRoute(
                 MixEditorActions(
                     onSettings = viewModel::editMixSettings,
                     onSettingsDone = viewModel::saveMixSettings,
+                    onMatchLevel = viewModel::matchMixLevel,
                     onBacking = viewModel::chooseMixBacking,
                     onPreview = viewModel::previewMix,
                     onStop = viewModel::stop,

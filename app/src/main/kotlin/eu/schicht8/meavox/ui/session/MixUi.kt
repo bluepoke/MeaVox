@@ -124,6 +124,7 @@ internal fun PreviewingMixPanel(state: SessionState.PreviewingMix, playback: Pla
 internal data class MixEditorActions(
     val onSettings: (MixSettings) -> Unit,
     val onSettingsDone: () -> Unit,
+    val onMatchLevel: () -> Unit,
     val onBacking: (BackingChoice) -> Unit,
     val onPreview: () -> Unit,
     val onStop: () -> Unit,
@@ -173,6 +174,7 @@ internal fun MixEditorSheet(
             LevelSlider(stringResource(R.string.mix_vocal), settings.vocalDb, MixSettings.MIN_VOCAL_DB..MixSettings.MAX_VOCAL_DB) {
                 actions.onSettings(settings.copy(vocalDb = it))
             }
+            MatchLevelRow(actions.onMatchLevel)
             NudgeControl(settings.vocalNudgeMs) { actions.onSettings(settings.copy(vocalNudgeMs = it)) }
             VocalEffectsControl(settings.effects) { actions.onSettings(settings.copy(effects = it)) }
             GuideVocalControl(settings.guideVocalLevel, track.guideVocalUnavailable(mix.backing), R.string.mix_guide_vocal_hint) {
@@ -225,6 +227,19 @@ private fun MixBackingRow(backing: BackingAudio, available: Boolean, onChoose: (
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** Match Level (#44): both levels set again, e.g. after switching the Backing Audio; the sliders stay for adjusting by hand. */
+@Composable
+private fun MatchLevelRow(onMatch: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        NeutralOutlinedButton(stringResource(R.string.mix_match_level), onMatch, Modifier.height(44.dp))
+        Text(
+            stringResource(R.string.mix_match_level_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

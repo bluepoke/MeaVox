@@ -25,10 +25,10 @@ void withSamples(JNIEnv *env, jfloatArray data, Use use) {
 
 JNI_FN(jlong, create)(JNIEnv *, jobject, jint sampleRate, jlong from, jlong to, jlong takeStart, jlong alignment,
                       jint transpose, jfloat backingGain, jfloat takeGain, jint reverb, jboolean compression,
-                      jboolean highPass, jfloat guideLevel) {
+                      jboolean highPass, jfloat guideLevel, jboolean limit) {
     const meavox::VocalEffects effects{static_cast<meavox::Reverb>(reverb), compression == JNI_TRUE, highPass == JNI_TRUE};
     return reinterpret_cast<jlong>(new OfflineMixRender(sampleRate, from, to, takeStart, alignment, transpose, backingGain,
-                                                        takeGain, effects, guideLevel));
+                                                        takeGain, effects, guideLevel, limit == JNI_TRUE));
 }
 
 JNI_FN(void, appendGuide)(JNIEnv *env, jobject, jlong h, jfloatArray data, jint frames, jint channels) {

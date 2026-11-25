@@ -334,6 +334,26 @@ class SessionViewModel(
         viewModelScope.launch { mixes.updateSettings(editor.mix, editor.settings) }
     }
 
+    /**
+     * Match Level (#44): the Backing Audio of the Mix being edited back at its own level and the Take
+     * as loud as it, measured over the Backing Audio it plays now; heard at once in a running preview.
+     * Only the two levels change: what else is edited meanwhile stays.
+     */
+    fun matchMixLevel() {
+        val editor = _editor.value ?: return
+        viewModelScope.launch {
+            try {
+                mixes.updateSettings(editor.mix, editor.settings)
+                val matched = mixes.matchLevel(editor.mix) ?: return@launch
+                val now = _editor.value?.takeIf { it.mix == editor.mix } ?: return@launch
+                editMixSettings(now.settings.copy(backingDb = matched.backingDb, vocalDb = matched.vocalDb))
+                saveMixSettings()
+            } catch (e: MixUnavailable) {
+                _message.value = e.text()
+            }
+        }
+    }
+
     fun chooseMixBacking(choice: BackingChoice) {
         val editor = _editor.value ?: return
         viewModelScope.launch {

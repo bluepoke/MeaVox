@@ -41,6 +41,7 @@ import eu.schicht8.meavox.data.RoomSettingsRepository
 import eu.schicht8.meavox.data.RoomTakeRepository
 import eu.schicht8.meavox.data.RoomTrackRepository
 import eu.schicht8.meavox.downloading.HttpMediaDownloader
+import eu.schicht8.meavox.engine.NativeLoudnessMeter
 import eu.schicht8.meavox.engine.NativeOfflineRenderer
 import eu.schicht8.meavox.engine.OboeAudioEngine
 import eu.schicht8.meavox.export.MediaStoreExports
@@ -89,7 +90,7 @@ class AppContainer(private val context: Context) {
     }
 
     // Mixes and their Export (#14, ADR 7, ADR 8).
-    val mixes: Mixes by lazy { Mixes(trackRepository, takeRepository, mixRepository, trackFiles, settingsRepository) }
+    val mixes: Mixes by lazy { Mixes(trackRepository, takeRepository, mixRepository, trackFiles, NativeLoudnessMeter()) }
     private val offlineRenderer by lazy { NativeOfflineRenderer() }
     private val exportStore by lazy { MediaStoreExports(context.contentResolver) }
     val exportMix: ExportMix by lazy {

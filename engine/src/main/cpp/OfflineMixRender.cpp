@@ -6,8 +6,10 @@
 namespace meavox {
 
 OfflineMixRender::OfflineMixRender(int32_t sampleRate, int64_t from, int64_t to, int64_t takeStart, int64_t alignment,
-                                   int transpose, float backingGain, float takeGain, VocalEffects effects, float guideLevel)
-    : mGuideLevel(guideLevel),
+                                   int transpose, float backingGain, float takeGain, VocalEffects effects, float guideLevel,
+                                   bool limit)
+    : mLimit(limit),
+      mGuideLevel(guideLevel),
       mTo(std::max(from, to)),
       mTakeStart(takeStart),
       mAlignment(alignment),
@@ -18,6 +20,10 @@ OfflineMixRender::OfflineMixRender(int32_t sampleRate, int64_t from, int64_t to,
     mBacking.configure(sampleRate);
     mEffects.configure(sampleRate);
     mEffects.set(effects);
+    if (mLimit) {
+        mLimiter.configure(sampleRate);
+        mSkip = mLimiter.latency();
+    }
     mWindow.start = mPos;
 }
 
@@ -77,8 +83,8 @@ void OfflineMixRender::endBacking() {
 
 void OfflineMixRender::renderAvailable() {
     const int64_t available = mWindow.end();
-    while (mPos < mTo) {
-        const auto n = static_cast<int32_t>(std::min<int64_t>(kRenderFrames, mTo - mPos));
+    while (mPos < renderTo()) {
+        const auto n = static_cast<int32_t>(std::min<int64_t>(kRenderFrames, renderTo() - mPos));
         // As in real-time playback, the stretcher reads mLead ahead; render only once that is here.
         const int64_t needed = mPos + n + (mTranspose != 0 ? mBacking.lead() : 0);
         if (!mBackingEnded && available < needed) break;
@@ -90,7 +96,15 @@ void OfflineMixRender::renderAvailable() {
         mStarted = true;
         mixTake(out, n, mPos, mTakeStart, mAlignment, mTake.data(), static_cast<int64_t>(mTake.size()), mBackingGain,
                 mTakeGain, &mEffects);
+        if (mLimit) mLimiter.process(out, n);
         clipOutput(out, n);
+        // The limiter's first frames are from before the span: drop them, so the output stays aligned.
+        if (mSkip > 0) {
+            const auto drop = static_cast<int32_t>(std::min<int64_t>(mSkip, n));
+            const auto first = mOutput.begin() + static_cast<long>(at);
+            mOutput.erase(first, first + static_cast<long>(drop) * 2);
+            mSkip -= drop;
+        }
         mPos += n;
         mWindow.dropBefore(mPos);
     }

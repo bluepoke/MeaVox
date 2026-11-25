@@ -15,6 +15,7 @@ import eu.schicht8.meavox.core.session.Session
 import eu.schicht8.meavox.core.session.SessionState
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.testing.FakeAudioEngine
+import eu.schicht8.meavox.core.testing.FakeLoudnessMeter
 import eu.schicht8.meavox.core.testing.InMemoryMixRepository
 import eu.schicht8.meavox.core.testing.InMemorySettingsRepository
 import eu.schicht8.meavox.core.testing.InMemoryTakeRepository
@@ -40,7 +41,7 @@ class LatencyAndMonitoringTest {
     private val settings = InMemorySettingsRepository()
     private val instrumental = files.stems(trackId, MODEL).instrumental
     private val engine = FakeAudioEngine(mapOf(files.originalAudio(trackId) to SONG_MS, instrumental to SONG_MS))
-    private val mixes = Mixes(tracks, takes, InMemoryMixRepository(), files, settings)
+    private val mixes = Mixes(tracks, takes, InMemoryMixRepository(), files, FakeLoudnessMeter())
     private val sessions = Sessions(tracks, takes, files, engine, settings, mixes)
 
     // --- Latency Correction ---

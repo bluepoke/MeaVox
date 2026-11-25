@@ -55,7 +55,7 @@ data class MixSettings(
     companion object {
         const val MIN_BACKING_DB = -40f
         const val MIN_VOCAL_DB = -20f
-        const val MAX_VOCAL_DB = 12f
+        const val MAX_VOCAL_DB = 30f
         const val MAX_NUDGE_MS = 200
 
         /** Mix Settings with each value moved into its range. */

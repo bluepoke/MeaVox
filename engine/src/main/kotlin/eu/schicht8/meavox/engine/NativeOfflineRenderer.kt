@@ -37,6 +37,7 @@ class NativeOfflineRenderer : OfflineRenderer {
             render.effects.compression,
             render.effects.highPass,
             if (guide != null) render.guideVocalLevel else 0f,
+            true,
         )
         try {
             AudioDecoder.decode(render.take.path, TakeSink(handle, render.sampleRate))
@@ -51,9 +52,9 @@ class NativeOfflineRenderer : OfflineRenderer {
     override suspend fun renderBacking(backing: AudioFile, transpose: Transpose, sink: PcmSink): Long =
         runInterruptible(Dispatchers.IO) {
             val rate = rateOf(backing)
-            // No Take, at unit gain, until the Backing Audio ends: the Backing Audio alone, as a Session plays it.
+            // No Take, at unit gain, until the Backing Audio ends: the Backing Audio alone, as a Session plays it, not limited.
             val handle = NativeMixRender.create(
-                rate, 0, NativeMixRender.UNTIL_END, 0, 0, transpose.semitones, 1f, 1f, NativePlayback.REVERB_DRY, false, false, 0f,
+                rate, 0, NativeMixRender.UNTIL_END, 0, 0, transpose.semitones, 1f, 1f, NativePlayback.REVERB_DRY, false, false, 0f, false,
             )
             try {
                 renderBacking(handle, backing, rate, sink)

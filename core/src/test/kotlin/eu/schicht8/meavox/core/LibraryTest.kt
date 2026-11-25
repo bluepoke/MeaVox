@@ -15,6 +15,7 @@ import eu.schicht8.meavox.core.model.TrackPipelineState
 import eu.schicht8.meavox.core.model.Transpose
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.testing.FakeAudioEngine
+import eu.schicht8.meavox.core.testing.FakeLoudnessMeter
 import eu.schicht8.meavox.core.testing.FakeSource
 import eu.schicht8.meavox.core.testing.InMemoryLyricsRepository
 import eu.schicht8.meavox.core.testing.InMemoryMixRepository
@@ -94,7 +95,7 @@ class LibraryTest {
         takes.add(take("t1", sung.id))
         takes.add(take("t2", sung.id))
         val files = InMemoryTrackFiles()
-        val sessions = Sessions(tracks, takes, files, FakeAudioEngine(), InMemorySettingsRepository(), Mixes(tracks, takes, InMemoryMixRepository(), files, InMemorySettingsRepository()), clock = { SUNG_AT })
+        val sessions = Sessions(tracks, takes, files, FakeAudioEngine(), InMemorySettingsRepository(), Mixes(tracks, takes, InMemoryMixRepository(), files, FakeLoudnessMeter()), clock = { SUNG_AT })
 
         sessions.open(sung.id, backgroundScope).apply {
             record() // sung: a Take started recording

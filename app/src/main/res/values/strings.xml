@@ -268,6 +268,8 @@
     <string name="mix_position">%1$s of %2$s</string>
     <string name="mix_take_details">%1$s · from %2$s · %3$s · Transpose %4$s</string>
     <string name="mix_vocal">Vocal</string>
+    <string name="mix_match_level">Match Level</string>
+    <string name="mix_match_level_hint">Sets the backing to its own level and your voice as loud as it, e.g. after switching the Backing Audio.</string>
     <string name="mix_preview">Preview</string>
     <string name="mix_preview_later">The preview can play once the Session is idle.</string>
     <string name="mix_backing_audio">Backing Audio</string>

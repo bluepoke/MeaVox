@@ -18,6 +18,9 @@
 // sample-aligned with the timeline. Plain playback follows setTranspose live; a recording and Take
 // playback keep the Transpose they were started with.
 //
+// Take playback (Review, the Mix Preview) goes through the true-peak limiter the Offline Render shares
+// (#44), so a Mix at backing 0 dB doesn't clip; below its ceiling it changes nothing.
+//
 // Practice Loop (#18): free playback that reaches B goes on at A, through the same BackingRenderer, so
 // a transposed loop is as seamless as a plain one.
 //
@@ -47,6 +50,7 @@
 #include <vector>
 
 #include "BackingRenderer.h"
+#include "Limiter.h"
 
 namespace meavox {
 
@@ -311,6 +315,8 @@ private:
     // Mix Preview (#16). The chain is the callback's, configured while the stream is closed; it is
     // reset when Take playback starts and follows mEffectsBits (reverb | compression << 2 | high-pass << 3).
     VocalChain mEffects;
+    // The true-peak limiter on the sum while a Take plays (#44), configured with mEffects and reset with it.
+    TruePeakLimiter mLimiter;
     std::atomic<int32_t> mEffectsBits{0};
     std::atomic<int64_t> mTakeTail{0};
     // Guide Vocal blocks, like mBlocks; read by the callback below mGuideDecoded. The callback sets

@@ -21,6 +21,7 @@ import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.session.backingAudio
 import eu.schicht8.meavox.core.testing.FakeAudioEngine
 import eu.schicht8.meavox.core.testing.FakeLocalFile
+import eu.schicht8.meavox.core.testing.FakeLoudnessMeter
 import eu.schicht8.meavox.core.testing.FakePipelineJobs
 import eu.schicht8.meavox.core.testing.FakeSeparator
 import eu.schicht8.meavox.core.testing.InMemoryMixRepository
@@ -109,7 +110,7 @@ class ReseparationTest {
                 .associateWith { 180_000L },
         )
         val settings = InMemorySettingsRepository()
-        val sessions = Sessions(tracks, takes, files, engine, settings, Mixes(tracks, takes, mixRepository, files, settings))
+        val sessions = Sessions(tracks, takes, files, engine, settings, Mixes(tracks, takes, mixRepository, files, FakeLoudnessMeter()))
         val session = sessions.open(track.id, backgroundScope)
         pipeline.reseparate(track.id, BEST)
         runCurrent()

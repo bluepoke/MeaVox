@@ -22,6 +22,7 @@ import eu.schicht8.meavox.core.session.BackingAudio
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.session.backingAudio
 import eu.schicht8.meavox.core.testing.FakeAudioEngine
+import eu.schicht8.meavox.core.testing.FakeLoudnessMeter
 import eu.schicht8.meavox.core.testing.FakePipelineJobs
 import eu.schicht8.meavox.core.testing.FakeSeparator
 import eu.schicht8.meavox.core.testing.InMemoryMixRepository
@@ -100,7 +101,7 @@ class VocalFreeTest {
         val engine = FakeAudioEngine()
 
         vocalFree.mark(id)
-        Sessions(tracks, InMemoryTakeRepository(), files, engine, InMemorySettingsRepository(), Mixes(tracks, InMemoryTakeRepository(), InMemoryMixRepository(), files, InMemorySettingsRepository())).open(id, backgroundScope)
+        Sessions(tracks, InMemoryTakeRepository(), files, engine, InMemorySettingsRepository(), Mixes(tracks, InMemoryTakeRepository(), InMemoryMixRepository(), files, FakeLoudnessMeter())).open(id, backgroundScope)
 
         assertEquals(TrackPipelineState.Ready(model = null), tracks.get(id)?.pipeline)
         assertEquals(files.originalAudio(id), engine.playback.value.loaded)

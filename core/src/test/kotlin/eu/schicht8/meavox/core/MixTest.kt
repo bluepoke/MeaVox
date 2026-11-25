@@ -10,6 +10,7 @@ import eu.schicht8.meavox.core.model.BackingChoice
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.Take
+import eu.schicht8.meavox.core.model.TakeId
 import eu.schicht8.meavox.core.model.Track
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.model.TrackPipelineState
@@ -19,6 +20,7 @@ import eu.schicht8.meavox.core.session.Session
 import eu.schicht8.meavox.core.session.SessionState
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.testing.FakeAudioEngine
+import eu.schicht8.meavox.core.testing.FakeLoudnessMeter
 import eu.schicht8.meavox.core.testing.InMemoryMixRepository
 import eu.schicht8.meavox.core.testing.InMemorySettingsRepository
 import eu.schicht8.meavox.core.testing.InMemoryTakeRepository
@@ -44,18 +46,22 @@ class MixTest {
     private val settings = InMemorySettingsRepository()
     private val instrumental = files.stems(trackId, FAST).instrumental
     private val engine = FakeAudioEngine(mapOf(files.originalAudio(trackId) to SONG_MS, instrumental to SONG_MS))
+    private val loudness = FakeLoudnessMeter()
     private var nextMix = 0
-    private val mixes = Mixes(tracks, takes, mixRepository, files, settings, clock = { NOW }, newMixId = { eu.schicht8.meavox.core.mix.MixId("m${++nextMix}") })
-    private val sessions = Sessions(tracks, takes, files, engine, settings, mixes, clock = { NOW })
+    private val mixes = Mixes(tracks, takes, mixRepository, files, loudness, clock = { NOW }, newMixId = { eu.schicht8.meavox.core.mix.MixId("m${++nextMix}") })
+    private var nextTake = 0
+    private val sessions = Sessions(tracks, takes, files, engine, settings, mixes, clock = { NOW }, newTakeId = { TakeId("t${++nextTake}") })
 
     private suspend fun addTrack(pipeline: TrackPipelineState, vocalFree: Boolean = false, choice: BackingChoice = BackingChoice.Instrumental) =
         tracks.addIfAbsent(Track(trackId, "Fly Me to the Moon", "Frank Sinatra", SONG_MS, pipeline, vocalFree = vocalFree, backingChoice = choice))
 
     @Test
-    fun `keeping a Take creates a default Mix over the Backing Audio it was sung over, at the Review Balance`() = runTest {
+    fun `keeping a Take creates a default Mix over the Backing Audio it was sung over, with the Take as loud as it`() = runTest {
         addTrack(TrackPipelineState.Ready(FAST))
         val session = sessions.open(trackId, backgroundScope)
         session.setReviewBackingDb(-14f)
+        loudness.loudness[instrumental] = -9f
+        loudness.loudness[files.take(trackId, TakeId("t1"))] = -27.4f
 
         val take = keepTake(session, fromMs = 30_000, lengthMs = 10_000)
 
@@ -63,7 +69,74 @@ class MixTest {
         assertEquals(take.id, mix.take)
         assertEquals("Mix 1", mix.name)
         assertEquals(BackingAudio.Instrumental(FAST), mix.backing)
-        assertEquals(MixSettings(backingDb = -14f, vocalDb = 0f, vocalNudgeMs = 0), mix.settings)
+        // The Backing Audio at its own level, the Take 18.4 dB louder: in whole dB, as the slider sets it. The Review Balance doesn't count.
+        assertEquals(MixSettings(backingDb = 0f, vocalDb = 18f, vocalNudgeMs = 0), mix.settings)
+        // The Backing Audio is measured where the Take was sung: from its Start Position until it ends.
+        assertEquals(
+            FakeLoudnessMeter.Measured(instrumental, fromFrame = 30_000 * 48L, toFrame = 40_000 * 48L),
+            loudness.measured.single { it.audio == instrumental },
+        )
+    }
+
+    @Test
+    fun `a Take with no measurable loudness, silent or too short, gets a new Mix at vocal 0 dB`() = runTest {
+        val session = openReady()
+        loudness.loudness[instrumental] = -9f
+
+        keepTake(session, fromMs = 30_000, lengthMs = 300)
+
+        assertEquals(MixSettings(backingDb = 0f, vocalDb = 0f), mixes.observe(trackId).first().single().settings)
+    }
+
+    @Test
+    fun `a Take is kept even when the Backing Audio can't be measured, with its Mix at vocal 0 dB`() = runTest {
+        val session = openReady()
+        loudness.loudness[files.take(trackId, TakeId("t1"))] = -27f
+        loudness.unreadable += instrumental
+
+        val take = keepTake(session, fromMs = 30_000, lengthMs = 10_000)
+
+        assertEquals(take, takes.get(take.id))
+        assertEquals(MixSettings(backingDb = 0f, vocalDb = 0f), mixes.observe(trackId).first().single().settings)
+    }
+
+    @Test
+    fun `a vocal level beyond the vocal range is clamped to it`() = runTest {
+        val session = openReady()
+        loudness.loudness[instrumental] = -6f
+        loudness.loudness[files.take(trackId, TakeId("t1"))] = -48f
+        loudness.loudness[files.take(trackId, TakeId("t2"))] = 0f
+
+        keepTake(session, fromMs = 0, lengthMs = 5_000)
+        keepTake(session, fromMs = 10_000, lengthMs = 5_000)
+
+        assertEquals(listOf(MixSettings.MAX_VOCAL_DB, -6f), mixes.observe(trackId).first().map { it.settings.vocalDb })
+        loudness.loudness[instrumental] = -40f
+        assertEquals(MixSettings.MIN_VOCAL_DB, mixes.create(TakeId("t2")).settings.vocalDb)
+    }
+
+    @Test
+    fun `Match level sets both levels again over the Mix's Backing Audio, keeping its other settings`() = runTest {
+        val session = openReady()
+        loudness.loudness[instrumental] = -9f
+        loudness.loudness[files.take(trackId, TakeId("t1"))] = -27f
+        keepTake(session, fromMs = 30_000, lengthMs = 10_000)
+        val mix = mixes.observe(trackId).first().single()
+        val edited = MixSettings(backingDb = -10f, vocalDb = 2f, vocalNudgeMs = 30, effects = VocalEffects(VocalEffects.Reverb.Hall))
+        mixes.updateSettings(mix.id, edited)
+        loudness.loudness[files.originalAudio(trackId)] = -7f
+
+        // Switching the Backing Audio leaves the levels as they are; only Match level sets them again.
+        mixes.chooseBacking(mix.id, BackingChoice.OriginalAudio)
+        assertEquals(edited, mixes.observe(trackId).first().single().settings)
+        val matched = mixes.matchLevel(mix.id)
+
+        assertEquals(edited.copy(backingDb = 0f, vocalDb = 20f), matched)
+        assertEquals(matched, mixes.observe(trackId).first().single().settings)
+        assertEquals(
+            FakeLoudnessMeter.Measured(files.originalAudio(trackId), 30_000 * 48L, 40_000 * 48L),
+            loudness.measured.last { it.audio != files.take(trackId, TakeId("t1")) },
+        )
     }
 
     @Test
@@ -85,15 +158,19 @@ class MixTest {
         val first = keepTake(session, fromMs = 0, lengthMs = 5_000)
         val second = keepTake(session, fromMs = 60_000, lengthMs = 5_000)
 
+        loudness.loudness[instrumental] = -12f
+        loudness.loudness[files.take(trackId, first.id)] = -20.2f
+
         val another = mixes.create(first.id)
 
         val all = mixes.observe(trackId).first()
         assertEquals(listOf("Mix 1", "Mix 2", "Mix 3"), all.map { it.name })
         assertEquals(listOf(first.id, second.id, first.id), all.map { it.take })
         assertEquals(another, all.last())
-        // A new Mix starts like a default one: over what the Track plays now, at the Review Balance.
+        // A new Mix starts like a default one: over what the Track plays now, with the Take as loud as it.
         assertEquals(BackingAudio.Instrumental(FAST), another.backing)
-        assertEquals(MixSettings(backingDb = Session.DEFAULT_REVIEW_BACKING_DB), another.settings)
+        assertEquals(MixSettings(backingDb = 0f, vocalDb = 8f), another.settings)
+        assertEquals(FakeLoudnessMeter.Measured(instrumental, 0, 5_000 * 48L), loudness.measured.last { it.audio == instrumental })
     }
 
     @Test

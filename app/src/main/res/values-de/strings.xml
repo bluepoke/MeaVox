@@ -253,6 +253,8 @@
     <string name="mix_position">%1$s von %2$s</string>
     <string name="mix_take_details">%1$s · ab %2$s · %3$s · transponiert %4$s</string>
     <string name="mix_vocal">Gesang</string>
+    <string name="mix_match_level">Pegel angleichen</string>
+    <string name="mix_match_level_hint">Stellt das Playback auf seinen eigenen Pegel und deine Stimme gleich laut, z. B. nachdem du das Playback gewechselt hast.</string>
     <string name="mix_preview">Vorschau</string>
     <string name="mix_preview_later">Die Vorschau kann laufen, sobald gerade nichts spielt oder aufnimmt.</string>
     <string name="mix_backing_audio">Playback</string>

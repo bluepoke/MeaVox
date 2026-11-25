@@ -21,6 +21,7 @@ import eu.schicht8.meavox.core.session.BackingAudio
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.testing.FakeAudioEngine
 import eu.schicht8.meavox.core.testing.FakeLocalFile
+import eu.schicht8.meavox.core.testing.FakeLoudnessMeter
 import eu.schicht8.meavox.core.testing.FakePipelineJobs
 import eu.schicht8.meavox.core.testing.FakeSource
 import eu.schicht8.meavox.core.testing.InMemoryMixRepository
@@ -169,7 +170,7 @@ class TrackPipelineTest {
         startPipeline()
         assertEquals(emptyList(), jobs.separations)
         val engine = FakeAudioEngine()
-        val sessions = Sessions(tracks, InMemoryTakeRepository(), files, engine, InMemorySettingsRepository(), Mixes(tracks, InMemoryTakeRepository(), InMemoryMixRepository(), files, InMemorySettingsRepository()))
+        val sessions = Sessions(tracks, InMemoryTakeRepository(), files, engine, InMemorySettingsRepository(), Mixes(tracks, InMemoryTakeRepository(), InMemoryMixRepository(), files, FakeLoudnessMeter()))
 
         val session = sessions.open(track.id, backgroundScope)
 
@@ -343,7 +344,7 @@ class TrackPipelineTest {
                 .associateWith { 180_000L },
         )
         val settings = InMemorySettingsRepository()
-        val sessions = Sessions(tracks, takes, files, engine, settings, Mixes(tracks, takes, InMemoryMixRepository(), files, settings))
+        val sessions = Sessions(tracks, takes, files, engine, settings, Mixes(tracks, takes, InMemoryMixRepository(), files, FakeLoudnessMeter()))
         val session = sessions.open(track.id, backgroundScope)
         session.seekTo(30_000)
         session.record()

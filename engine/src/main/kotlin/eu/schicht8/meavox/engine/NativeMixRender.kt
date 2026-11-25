@@ -13,6 +13,7 @@ internal object NativeMixRender {
     /**
      * Gains are linear; Take sample j sounds at timeline frame takeStart + j − alignment, through the
      * Vocal Effects ([reverb] as in [NativePlayback.REVERB_DRY]). [guideLevel] is the Guide Vocal's, 0..1.
+     * With [limit], the sum goes through the true-peak limiter the Mix Preview shares (#44): for a Mix, not a Backing Export.
      */
     external fun create(
         sampleRate: Int,
@@ -27,6 +28,7 @@ internal object NativeMixRender {
         compression: Boolean,
         highPass: Boolean,
         guideLevel: Float,
+        limit: Boolean,
     ): Long
     /** Guide Vocal frames, fed before the Backing Audio frames of the same index. */
     external fun appendGuide(handle: Long, interleaved: FloatArray, frames: Int, channels: Int)

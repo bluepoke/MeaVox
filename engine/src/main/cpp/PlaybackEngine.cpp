@@ -188,6 +188,7 @@ void PlaybackEngine::discardLoad() {
 // Only while no callback can run (the stream is closed).
 void PlaybackEngine::configureStretchLocked(int32_t sampleRate) {
     mEffects.configure(sampleRate);
+    mLimiter.configure(sampleRate);
     const int32_t lead = mBacking.configure(sampleRate);
     LOGI("Transpose: stretcher at %d Hz, read-ahead %d frames", sampleRate, lead);
 }
@@ -853,10 +854,15 @@ oboe::DataCallbackResult PlaybackEngine::onAudioReady(oboe::AudioStream *, void 
         // A Mix Preview's Vocal Effects, from a fresh state when the Take starts, like the Offline Render.
         const int32_t bits = mEffectsBits.load(std::memory_order_relaxed);
         const VocalEffects effects{static_cast<Reverb>(bits & 3), (bits & (1 << 2)) != 0, (bits & (1 << 3)) != 0};
-        if (seek >= 0) mEffects.reset();
+        if (seek >= 0) {
+            mEffects.reset();
+            mLimiter.reset();
+        }
         if (effects != mEffects.effects()) mEffects.set(effects);
         mixTake(out, numFrames, start, mTakeStart, align, mTake.data(), takeFrames,
                 mReviewBackingGain.load(std::memory_order_relaxed), mTakeGain.load(std::memory_order_relaxed), &mEffects);
+        // As the Offline Render limits a Mix (#44); it lags by mLimiter.latency(), under 2 ms.
+        mLimiter.process(out, numFrames);
         pos = start + numFrames;  // the Take may run on past the decoded Backing Audio
         // With a reverb, it runs on for the tail.
         if (pos - mTakeStart + align >= takeFrames + mTakeTail.load(std::memory_order_relaxed)) finished = true;

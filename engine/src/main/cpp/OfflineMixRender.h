@@ -8,6 +8,10 @@
 // A Mix's Vocal Effects (#16) go on the Take; its Guide Vocal (a Vocal Stem, fed in step with the
 // Backing Audio) is added to the Backing Audio before it is transposed, as in the Mix Preview.
 //
+// A Mix's sum goes through the true-peak limiter the Mix Preview shares (#44). Its look-ahead delays
+// the audio, so the render runs on that many frames past [to] and drops as many from its start: the
+// output stays aligned with the timeline. A Backing Export isn't limited: it is the Backing Audio as it is.
+//
 // Streaming: the Take is held whole (mono), but the Backing Audio is fed in order from frame 0 and
 // only a short window of it is kept, so a Session holding the same song in memory isn't doubled.
 //
@@ -18,6 +22,7 @@
 #include <vector>
 
 #include "BackingRenderer.h"
+#include "Limiter.h"
 
 namespace meavox {
 
@@ -27,8 +32,10 @@ public:
     // at kUntilEnd it renders until the Backing Audio ends (a Backing Export).
     static constexpr int64_t kUntilEnd = INT64_MAX;
 
+    // With [limit], the sum goes through the true-peak limiter (a Mix; not a Backing Export).
     OfflineMixRender(int32_t sampleRate, int64_t from, int64_t to, int64_t takeStart, int64_t alignment, int transpose,
-                     float backingGain, float takeGain, VocalEffects effects = {}, float guideLevel = 0.0f);
+                     float backingGain, float takeGain, VocalEffects effects = {}, float guideLevel = 0.0f,
+                     bool limit = false);
 
     // Appends Guide Vocal audio (stereo; mono to both), in order from timeline frame 0. Each Backing
     // Audio frame is added to the Guide Vocal frame of the same index, so feed it first.
@@ -48,7 +55,7 @@ public:
     int32_t drain(float *out, int32_t maxFrames);
 
     // Every frame up to [to] is rendered (it may still need draining).
-    bool rendered() const { return mPos >= mTo; }
+    bool rendered() const { return mPos >= renderTo(); }
 
     // More Backing Audio must be fed to render the rest.
     bool needsBacking() const { return !rendered() && !mBackingEnded; }
@@ -72,8 +79,14 @@ private:
 
     void renderAvailable();
 
+    // Where rendering stops: [to], and the limiter's latency on, which is dropped from the start.
+    int64_t renderTo() const { return mLimit && mTo != kUntilEnd ? mTo + mLimiter.latency() : mTo; }
+
     BackingRenderer mBacking;
     VocalChain mEffects;
+    TruePeakLimiter mLimiter;
+    const bool mLimit;
+    int64_t mSkip = 0;  // limited frames still to drop: the limiter's latency, at the start
     Window mWindow;
     const float mGuideLevel;
     std::vector<float> mGuide;  // interleaved stereo Guide Vocal frames fed ahead of the Backing Audio
