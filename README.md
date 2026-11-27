@@ -1,4 +1,4 @@
-# MeaVox
+<h1 align="center"><img src="docs/logo/meavox-logo.svg" alt="MeaVox" width="420"></h1>
 
 An Android karaoke and singing-practice app. Find a music video, remove the vocals, sing over the instrumental with the lyrics on screen, and export your performance.
 
