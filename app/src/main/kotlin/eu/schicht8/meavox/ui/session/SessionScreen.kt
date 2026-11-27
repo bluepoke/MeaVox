@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
@@ -80,6 +81,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -196,6 +198,8 @@ fun SessionRoute(
     LaunchedEffect(backing != null) {
         if (backing != null && micAllowed()) viewModel.onMicrophoneAllowed()
     }
+    val running by viewModel.running.collectAsStateWithLifecycle()
+    KeepScreenOn(running)
     val message by viewModel.message.collectAsStateWithLifecycle()
     val resources = LocalResources.current
     val snackbar = remember { SnackbarHostState() }
@@ -1348,5 +1352,18 @@ private fun ReviewPreview() {
             ),
             actions = SessionActions(),
         )
+    }
+}
+
+/**
+ * Keeps the screen on while [on] (#48): only the window flag, no wake lock. Leaving the screen or
+ * the app going to the background clears it at once, so the system screen timeout applies again.
+ */
+@Composable
+private fun KeepScreenOn(on: Boolean) {
+    val view = LocalView.current
+    LifecycleStartEffect(view, on) {
+        view.keepScreenOn = on
+        onStopOrDispose { view.keepScreenOn = false }
     }
 }

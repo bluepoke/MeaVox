@@ -183,6 +183,9 @@ class SessionViewModel(
 
     val state: StateFlow<SessionState> = from(SessionState.Idle) { it.state }
     val playback: StateFlow<Playback> = from(Playback.Idle) { it.playback }
+
+    /** [Session.running]: while it is true, the Track's screen stays on (#48). */
+    val running: StateFlow<Boolean> = from(false) { it.running }
     val input: StateFlow<InputLevel> = from(InputLevel.Off) { it.input }
     val inputGainDb: StateFlow<Float> = from(0f) { it.inputGainDb }
 

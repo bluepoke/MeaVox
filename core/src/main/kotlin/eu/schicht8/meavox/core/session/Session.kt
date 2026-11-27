@@ -36,6 +36,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -94,6 +95,14 @@ class Session private constructor(
     private var load: LoadId? = null
 
     val playback: StateFlow<Playback> get() = engine.playback
+
+    /**
+     * Something runs in the Session (#48): audio plays (free playback, recording, Review, a kept Take
+     * or a Mix Preview), or the countdown before a Take, which is silent. False while paused or stopped.
+     */
+    val running: Flow<Boolean>
+        get() = combine(_state, engine.playback) { state, playback -> playback.playing || state is SessionState.CountingDown }
+            .distinctUntilChanged()
 
     /** The microphone meter: level, clipping and which microphone is in use. */
     val input: StateFlow<InputLevel> get() = engine.input

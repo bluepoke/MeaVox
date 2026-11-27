@@ -25,3 +25,6 @@ Track detail played the Track and showed the Track Pipeline status, the Lyrics c
 - ADR 14's Vocal-Free toggle and the "Mark Vocal-Free" snackbar after a share are on the Track's screen.
 - The Track's screen plays through the Session's output path, which since ADR 16 is the normal one that Track detail used.
 - The Backing Export (#24), the Guide Vocal (#18) and Monitoring (#9) put their controls on this screen when they are built.
+
+## Note: the screen stays on while the Session runs (#48, 2026-11-27)
+The Track's screen keeps the display on while something runs in the Session: audio plays (free playback, recording, Review, a kept Take, the Mix Preview) or the silent countdown before a Take counts. Paused or stopped, and on every other screen, the system screen timeout applies. It is the window flag only (`View.keepScreenOn`), with no wake lock and no permission; `Session.running` decides it.
