@@ -576,8 +576,7 @@ private fun TrackTitle(track: Track?) {
 private fun SessionControls(openError: UiText?, content: SessionContent, actions: SessionActions) {
     val track = content.track ?: return LinearProgressIndicator(Modifier.fillMaxWidth())
     PipelineStatus(track, content.modelName, actions.onRetry)
-    VocalRemoval(track, content.modelName, actions.onReseparate)
-    LyricsStatus(content.lyrics, actions.onConfirmLyrics, actions.onChooseLyrics)
+    VocalRemovalAndLyrics(track, content, actions)
     when {
         openError != null -> Text(stringResource(R.string.session_cant_play, openError.resolve()), color = MaterialTheme.colorScheme.error)
         // Nothing to play until the Original Audio is stored; the Session opens by itself then (ADR 10).
@@ -703,25 +702,63 @@ private fun PreviousInstrumental(track: Track, modelName: (SeparationModelId) ->
  * Vocal-Free Track, which isn't separated (ADR 14), nor before the Original Audio is stored.
  */
 @Composable
-private fun VocalRemoval(track: Track, modelName: (SeparationModelId) -> String, onReseparate: () -> Unit) {
-    if (track.vocalFree || !track.hasOriginalAudio) return
+private fun VocalRemoval(
+    track: Track,
+    modelName: (SeparationModelId) -> String,
+    onReseparate: () -> Unit,
+    /** The button below the model, as the Lyrics' buttons are, rather than at the right edge. */
+    stacked: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
     // After a failed Separation, the model Retry separates with.
     val model = track.vocalRemovalModel ?: track.separationModel.takeIf { track.pipeline is TrackPipelineState.Failed }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(R.string.import_vocal_removal), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            model?.let { Text(modelName(it), style = rowLabel()) }
+    val label = @Composable {
+        Text(stringResource(R.string.import_vocal_removal), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        model?.let { Text(modelName(it), style = rowLabel()) }
+    }
+    if (stacked) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            label()
+            NeutralOutlinedButton(stringResource(R.string.confirm_reseparate), onReseparate, Modifier.height(44.dp))
         }
-        NeutralOutlinedButton(stringResource(R.string.confirm_reseparate), onReseparate, Modifier.height(44.dp))
+    } else {
+        Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) { label() }
+            NeutralOutlinedButton(stringResource(R.string.confirm_reseparate), onReseparate, Modifier.height(44.dp))
+        }
+    }
+}
+
+/**
+ * Vocal removal and the Lyrics: side by side, each half the width, where there is room; one below the
+ * other on a narrow screen. A Vocal-Free Track, or one without its Original Audio yet, has no vocal
+ * removal to show, so the Lyrics take the width.
+ */
+@Composable
+private fun VocalRemovalAndLyrics(track: Track, content: SessionContent, actions: SessionActions) {
+    val vocalRemoval = !track.vocalFree && track.hasOriginalAudio
+    BoxWithConstraints {
+        if (vocalRemoval && maxWidth >= SIDE_BY_SIDE) {
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                VocalRemoval(track, content.modelName, actions.onReseparate, stacked = true, modifier = Modifier.weight(1f))
+                LyricsStatus(content.lyrics, actions.onConfirmLyrics, actions.onChooseLyrics, Modifier.weight(1f))
+            }
+        } else {
+            // The spacing of the column these sections sit in.
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (vocalRemoval) VocalRemoval(track, content.modelName, actions.onReseparate)
+                LyricsStatus(content.lyrics, actions.onConfirmLyrics, actions.onChooseLyrics)
+            }
+        }
     }
 }
 
 /** Which Lyrics the Track has, and how to confirm or change them (ADR 6). */
 @Composable
-private fun LyricsStatus(lyrics: TrackLyrics?, onConfirm: () -> Unit, onChoose: () -> Unit) {
+private fun LyricsStatus(lyrics: TrackLyrics?, onConfirm: () -> Unit, onChoose: () -> Unit, modifier: Modifier = Modifier) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val small = MaterialTheme.typography.bodySmall
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stringResource(R.string.session_lyrics), style = MaterialTheme.typography.labelLarge, color = muted)
         when (lyrics) {
             null, TrackLyrics.Searching -> {
