@@ -2,6 +2,8 @@
 package eu.schicht8.meavox.export
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -10,15 +12,19 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.port.ExportFormat
 import eu.schicht8.meavox.core.port.ExportTags
 import eu.schicht8.meavox.core.port.ExportedFile
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.ByteArrayOutputStream
 import java.nio.ByteOrder
 import kotlin.math.PI
 import kotlin.math.abs
@@ -28,7 +34,8 @@ import kotlin.math.sqrt
 /**
  * Adapter contract of #15 (spec #1, testing decisions): a short Export in each format, written through MediaStore like a real one and read
  * back with the platform's extractor, decoders and metadata reader: its length, channels, sample
- * rate, tags, and that it holds the tone that went in.
+ * rate, tags, and that it holds the tone that went in. The Cover Art of #42 is read back with the
+ * platform's metadata reader, as a player or the gallery would.
  */
 @RunWith(AndroidJUnit4::class)
 class MediaStoreExportsRoundTripTest {
@@ -76,6 +83,26 @@ class MediaStoreExportsRoundTripTest {
     }
 
     @Test
+    fun mp3CarriesTheCoverArt() {
+        roundTrip(ExportFormat.Mp3(), "mp3", "audio/mpeg", tags = tags.copy(cover = cover))
+    }
+
+    @Test
+    fun mp3At320kbpsCarriesTheCoverArt() {
+        roundTrip(ExportFormat.Mp3(ExportFormat.Mp3.Bitrate.Cbr320), "mp3", "audio/mpeg", tags = tags.copy(cover = cover))
+    }
+
+    @Test
+    fun m4aCarriesTheCoverArt() {
+        roundTrip(ExportFormat.M4a, "m4a", "audio/mp4", tags = tags.copy(cover = cover))
+    }
+
+    @Test
+    fun m4aOfUnknownLengthCarriesTheCoverArt() {
+        roundTrip(ExportFormat.M4a, "m4a", "audio/mp4", knownLength = false, tags = tags.copy(cover = cover))
+    }
+
+    @Test
     fun wavStillWorks() {
         roundTrip(ExportFormat.Wav(16), "wav", "audio/x-wav", knownLength = false)
     }
@@ -86,6 +113,7 @@ class MediaStoreExportsRoundTripTest {
         mimeType: String,
         knownLength: Boolean = true,
         rate: Int = 48_000,
+        tags: ExportTags = this.tags,
     ): ExportedFile = runBlocking {
         val frames = rate * SECONDS
         val writer = exports.create(tags, format, rate, if (knownLength) frames.toLong() else null)
@@ -118,6 +146,10 @@ class MediaStoreExportsRoundTripTest {
                 meta.setDataSource(context, uri)
                 assertEquals(tags.title, meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE))
                 assertEquals(tags.artist, meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST))
+                when (val expected = tags.cover) {
+                    null -> assertNull("no Cover Art", meta.embeddedPicture)
+                    else -> assertArrayEquals("the Cover Art as it went in", expected.jpeg, meta.embeddedPicture)
+                }
             }
         }
 
@@ -130,6 +162,21 @@ class MediaStoreExportsRoundTripTest {
         assertTrue("left RMS ${decoded.leftRms}", decoded.leftRms in 0.3..0.4)
         assertTrue("right RMS ${decoded.rightRms}", decoded.rightRms < 0.02)
         file
+    }
+
+    /**
+     * A real JPEG, as the Track's Cover Art is stored. Its bytes hold 0xFF followed by bytes an MPEG
+     * frame header could start with, which a reader must not take for audio inside the ID3 tag.
+     */
+    private val cover: CoverArt = run {
+        val bitmap = Bitmap.createBitmap(320, 180, Bitmap.Config.ARGB_8888)
+        for (x in 0 until bitmap.width) {
+            for (y in 0 until bitmap.height) bitmap.setPixel(x, y, Color.rgb(x * 255 / bitmap.width, y * 255 / bitmap.height, 128))
+        }
+        val out = ByteArrayOutputStream()
+        check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out))
+        bitmap.recycle()
+        CoverArt(out.toByteArray())
     }
 
     private class Decoded(val channels: Int, val sampleRate: Int, val durationUs: Long, val frames: Int, val leftRms: Double, val rightRms: Double)
