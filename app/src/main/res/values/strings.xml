@@ -226,7 +226,7 @@
     <string name="session_transpose_down">Transpose down</string>
     <string name="session_transpose_up">Transpose up</string>
     <string name="session_transpose_next_take">This Take stays at %1$s; the new setting applies to the next Take.</string>
-    <string name="session_loop">Practice Loop</string>
+    <string name="session_loop">Loop</string>
     <string name="session_loop_a" translatable="false">A</string>
     <string name="session_loop_b" translatable="false">B</string>
     <string name="session_loop_mark_a">Set A here</string>

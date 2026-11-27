@@ -214,7 +214,7 @@
     <string name="session_transpose_down">Tiefer transponieren</string>
     <string name="session_transpose_up">Höher transponieren</string>
     <string name="session_transpose_next_take">Dieser Take bleibt bei %1$s; die neue Einstellung gilt für den nächsten Take.</string>
-    <string name="session_loop">Übungsschleife</string>
+    <string name="session_loop">Schleife</string>
     <string name="session_loop_mark_a">A hier setzen</string>
     <string name="session_loop_mark_b">B hier setzen</string>
     <string name="session_loop_off">Aus</string>

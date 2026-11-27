@@ -12,6 +12,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -584,8 +585,7 @@ private fun SessionControls(openError: UiText?, content: SessionContent, actions
             LinearProgressIndicator(progress = { content.loadProgress }, modifier = Modifier.fillMaxWidth())
         }
         else -> {
-            // A Vocal-Free Track has no Instrumental: it always plays its Original Audio (ADR 14).
-            if (!track.vocalFree) BackingChoiceRow(track, content.backing, actions.onChooseBacking)
+            SessionSettings(track, content, actions)
             Position(content.state, content.playback, content.practiceLoop, actions.onSeek)
             Transport(content.state, content.playback, content.reviewBackingDb, content.latencyCorrection, actions)
             // The microphone hears the speaker (#9).
@@ -594,8 +594,6 @@ private fun SessionControls(openError: UiText?, content: SessionContent, actions
             if (recordingOrAboutTo && content.output?.withoutHeadphones == true) {
                 Text(stringResource(R.string.session_without_headphones), style = MaterialTheme.typography.bodySmall, color = MeaVoxTheme.colors.record)
             }
-            PracticeLoopRow(content.practiceLoop, content.state, actions)
-            TransposeControl(content.transpose, content.state, actions.onTranspose)
             GuideVocalControl(
                 content.guideVocalLevel, content.guideVocalUnavailable, R.string.session_guide_vocal_hint,
                 onChange = actions.onGuideVocal,
@@ -617,12 +615,10 @@ private fun SessionControls(openError: UiText?, content: SessionContent, actions
  * removal is done; the Original Audio plays meanwhile.
  */
 @Composable
-private fun BackingChoiceRow(track: Track, playing: BackingAudio, onChoose: (BackingChoice) -> Unit) {
+private fun BackingChoiceControl(track: Track, onChoose: (BackingChoice) -> Unit, modifier: Modifier = Modifier) {
     val available = track.instrumentalModel != null
-    val shown = if (available) track.backingChoice else BackingChoice.OriginalAudio
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(stringResource(R.string.session_sing_over), style = rowLabel())
+    val shown = shownBackingChoice(track)
+    SettingGroup(stringResource(R.string.session_sing_over), modifier) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             Choice(stringResource(R.string.backing_instrumental), shown == BackingChoice.Instrumental, index = 0, count = 2, enabled = available) {
                 onChoose(BackingChoice.Instrumental)
@@ -631,12 +627,25 @@ private fun BackingChoiceRow(track: Track, playing: BackingAudio, onChoose: (Bac
                 onChoose(BackingChoice.OriginalAudio)
             }
         }
-        val playingShown = (playing is BackingAudio.Instrumental) == (shown == BackingChoice.Instrumental)
-        when {
-            !available -> Text(stringResource(R.string.session_instrumental_later), style = MaterialTheme.typography.bodySmall, color = muted)
-            // Never under a Take being recorded, reviewed or played back (ADR 20).
-            !playingShown -> Text(stringResource(R.string.session_switches_after_take), style = MaterialTheme.typography.bodySmall, color = muted)
-        }
+    }
+}
+
+/** The Backing Audio the choice shows: the Track's, but the Original Audio until there is an Instrumental. */
+private fun shownBackingChoice(track: Track): BackingChoice =
+    if (track.instrumentalModel != null) track.backingChoice else BackingChoice.OriginalAudio
+
+/** What the Backing Audio choice has to say, if anything: no Instrumental yet, or it switches after the Take. */
+@Composable
+private fun backingHint(track: Track, playing: BackingAudio?): String? {
+    if (track.vocalFree || playing == null) return null
+    val available = track.instrumentalModel != null
+    val shown = shownBackingChoice(track)
+    val playingShown = (playing is BackingAudio.Instrumental) == (shown == BackingChoice.Instrumental)
+    return when {
+        !available -> stringResource(R.string.session_instrumental_later)
+        // Never under a Take being recorded, reviewed or played back (ADR 20).
+        !playingShown -> stringResource(R.string.session_switches_after_take)
+        else -> null
     }
 }
 
@@ -812,27 +821,27 @@ private fun LoopRange(loop: PracticeLoop, durationMs: Float) {
  * playback then repeats A–B. A Take records straight on; the loop stays for afterwards.
  */
 @Composable
-private fun PracticeLoopRow(loop: PracticeLoop?, state: SessionState, actions: SessionActions) {
+private fun PracticeLoopControl(loop: PracticeLoop?, state: SessionState, actions: SessionActions, modifier: Modifier = Modifier) {
     val idle = state == SessionState.Idle
-    val end = loop?.endMs
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    SettingGroup(stringResource(R.string.session_loop), modifier) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.session_loop), Modifier.weight(1f), style = rowLabel())
             StepButton(stringResource(R.string.session_loop_a), stringResource(R.string.session_loop_mark_a), enabled = idle, onClick = actions.onMarkLoopStart)
             StepButton(stringResource(R.string.session_loop_b), stringResource(R.string.session_loop_mark_b), enabled = idle && loop != null, onClick = actions.onMarkLoopEnd)
             TextButton(onClick = actions.onClearLoop, enabled = loop != null, shape = MeaVoxButtonShape) {
                 Text(stringResource(R.string.session_loop_off))
             }
         }
-        Text(
-            when {
-                loop == null -> stringResource(R.string.session_loop_hint)
-                end == null -> stringResource(R.string.session_loop_mark_b_next, formatTime(loop.startMs))
-                else -> stringResource(R.string.session_loop_range, formatTime(loop.startMs), formatTime(end))
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    }
+}
+
+/** How to set the Practice Loop, or where it runs. */
+@Composable
+private fun loopHint(loop: PracticeLoop?): String {
+    val end = loop?.endMs
+    return when {
+        loop == null -> stringResource(R.string.session_loop_hint)
+        end == null -> stringResource(R.string.session_loop_mark_b_next, formatTime(loop.startMs))
+        else -> stringResource(R.string.session_loop_range, formatTime(loop.startMs), formatTime(end))
     }
 }
 
@@ -888,17 +897,9 @@ private fun Transport(state: SessionState, playback: Playback, reviewBackingDb: 
 
 /** The Transpose control (ADR 5). A Take being recorded or played back keeps its own Transpose. */
 @Composable
-private fun TransposeControl(transpose: Transpose, state: SessionState, onChange: (Transpose) -> Unit) {
-    // The Transpose the Backing Audio is bound to while a Take records or plays back.
-    val takeTranspose = when (state) {
-        is SessionState.Recording -> state.transpose
-        is SessionState.Review -> state.transpose
-        is SessionState.PlayingTake -> state.take.transpose
-        else -> null
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.session_transpose), Modifier.weight(1f), style = rowLabel())
+private fun TransposeControl(transpose: Transpose, onChange: (Transpose) -> Unit, modifier: Modifier = Modifier) {
+    SettingGroup(stringResource(R.string.session_transpose), modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StepButton("−", stringResource(R.string.session_transpose_down), enabled = transpose.semitones > Transpose.MIN) {
                 onChange(Transpose(transpose.semitones - 1))
             }
@@ -913,15 +914,72 @@ private fun TransposeControl(transpose: Transpose, state: SessionState, onChange
                 onChange(Transpose(transpose.semitones + 1))
             }
         }
-        if (takeTranspose != null && takeTranspose != transpose) {
-            Text(
-                stringResource(R.string.session_transpose_next_take, takeTranspose.label()),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    }
+}
+
+/** The key the Backing Audio is bound to while a Take records or plays back, if it isn't the control's. */
+@Composable
+private fun transposeHint(transpose: Transpose, state: SessionState): String? {
+    val takeTranspose = when (state) {
+        is SessionState.Recording -> state.transpose
+        is SessionState.Review -> state.transpose
+        is SessionState.PlayingTake -> state.take.transpose
+        else -> null
+    }
+    return if (takeTranspose != null && takeTranspose != transpose) stringResource(R.string.session_transpose_next_take, takeTranspose.label()) else null
+}
+
+/**
+ * The Backing Audio choice, the Practice Loop and Transpose, set before singing (#53): one row, each
+ * label above its controls; on a narrow screen the Backing Audio choice takes a line of its own. A
+ * Vocal-Free Track has no Backing Audio choice (ADR 14). The hints follow below, full width, while they
+ * have something to say.
+ */
+@Composable
+private fun SessionSettings(track: Track, content: SessionContent, actions: SessionActions) {
+    val hints = listOfNotNull(
+        backingHint(track, content.backing),
+        loopHint(content.practiceLoop),
+        transposeHint(content.transpose, content.state),
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        BoxWithConstraints {
+            // A Vocal-Free Track has no Instrumental, so no Backing Audio choice (ADR 14).
+            val showBackingChoice = !track.vocalFree
+            if (maxWidth >= SIDE_BY_SIDE) {
+                // Top-aligned, so the labels share one line.
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    if (showBackingChoice) BackingChoiceControl(track, actions.onChooseBacking, Modifier.weight(1f))
+                    PracticeLoopControl(content.practiceLoop, content.state, actions)
+                    TransposeControl(content.transpose, actions.onTranspose)
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (showBackingChoice) BackingChoiceControl(track, actions.onChooseBacking, Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        PracticeLoopControl(content.practiceLoop, content.state, actions)
+                        TransposeControl(content.transpose, actions.onTranspose)
+                    }
+                }
+            }
+        }
+        for (hint in hints) {
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
+
+/** A setting's label above its controls (#53). */
+@Composable
+private fun SettingGroup(label: String, modifier: Modifier = Modifier, controls: @Composable () -> Unit) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = rowLabel())
+        controls()
+    }
+}
+
+/** The content width from which the Track's screen puts side by side what a narrow screen stacks (#53). */
+private val SIDE_BY_SIDE = 600.dp
 
 /** A square 44 dp − / + button. */
 @Composable
@@ -1130,10 +1188,18 @@ private fun Microphone(input: InputLevel, gainDb: Float, onGain: (Float) -> Unit
             return@Panel
         }
         Text(stringResource(R.string.session_microphone, input.device?.label() ?: stringResource(R.string.device_unknown)), style = MaterialTheme.typography.labelLarge)
-        LevelMeter(meterLevel(input.peak), input.clipping)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            for (mark in listOf("−60 dB", "−30", "0 dB")) {
-                Text(mark, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // The level beside the gain, each half the width (#53); stacked on a narrow screen.
+        BoxWithConstraints {
+            if (maxWidth >= SIDE_BY_SIDE) {
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    InputLevelMeter(input, Modifier.weight(1f))
+                    InputGain(gainDb, onGain, Modifier.weight(1f))
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    InputLevelMeter(input, Modifier.fillMaxWidth())
+                    InputGain(gainDb, onGain, Modifier.fillMaxWidth().padding(top = 4.dp))
+                }
             }
         }
         if (input.clipping) {
@@ -1143,23 +1209,40 @@ private fun Microphone(input: InputLevel, gainDb: Float, onGain: (Float) -> Unit
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        // Dragging changes the gain live; it is saved for this kind of microphone.
-        var dragDb by remember { mutableStateOf<Float?>(null) }
-        val shown = dragDb ?: gainDb
-        Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.session_input_gain, formatDb(shown)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Slider(
-                value = shown,
-                onValueChange = {
-                    dragDb = it.roundToInt().toFloat()
-                    onGain(it.roundToInt().toFloat())
-                },
-                onValueChangeFinished = { dragDb = null },
-                valueRange = Session.MIN_INPUT_GAIN_DB..Session.MAX_INPUT_GAIN_DB,
-                colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer),
-                modifier = Modifier.fillMaxWidth(),
-            )
+    }
+}
+
+/** The microphone's level, with its scale below. */
+@Composable
+private fun InputLevelMeter(input: InputLevel, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LevelMeter(meterLevel(input.peak), input.clipping)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            for (mark in listOf("−60 dB", "−30", "0 dB")) {
+                Text(mark, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
+    }
+}
+
+/** The input gain: dragging changes it live; it is saved for this kind of microphone. */
+@Composable
+private fun InputGain(gainDb: Float, onGain: (Float) -> Unit, modifier: Modifier = Modifier) {
+    var dragDb by remember { mutableStateOf<Float?>(null) }
+    val shown = dragDb ?: gainDb
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(R.string.session_input_gain, formatDb(shown)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Slider(
+            value = shown,
+            onValueChange = {
+                dragDb = it.roundToInt().toFloat()
+                onGain(it.roundToInt().toFloat())
+            },
+            onValueChangeFinished = { dragDb = null },
+            valueRange = Session.MIN_INPUT_GAIN_DB..Session.MAX_INPUT_GAIN_DB,
+            colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -1395,5 +1478,57 @@ private fun KeepScreenOn(on: Boolean) {
     LifecycleStartEffect(view, on) {
         view.keepScreenOn = on
         onStopOrDispose { view.keepScreenOn = false }
+    }
+}
+
+/** An idle Session's content for the settings previews (#53). */
+private fun previewContent(vocalFree: Boolean = false) = SessionContent(
+    track = Track(
+        TrackId(SourceId("local"), "x"), "Fly Me to the Moon", "Frank Sinatra", 148_000,
+        TrackPipelineState.Ready(SeparationModelId("fast")), vocalFree = vocalFree,
+    ),
+    loadProgress = 1f,
+    state = SessionState.Idle,
+    backing = BackingAudio.Instrumental(SeparationModelId("fast")),
+    playback = Playback(null, playing = false, positionMs = 32_000, durationMs = 180_000),
+    input = InputLevel(enabled = true, device = InputDevice.BuiltIn, peak = 0.4f, clipping = false),
+    inputGainDb = 0f,
+    countdownEnabled = true,
+    reviewBackingDb = -20f,
+    takes = emptyList(),
+    lyrics = null,
+    lyricsOffsetMs = 0,
+    karaoke = false,
+    transpose = Transpose(1),
+)
+
+/** The row of #53 and the microphone panel, at the width the preview gives. */
+@Composable
+private fun SessionSettingsAndMicrophone() {
+    MeaVoxTheme {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            val content = previewContent()
+            SessionSettings(checkNotNull(content.track), content, SessionActions())
+            Microphone(content.input, content.inputGainDb, onGain = {})
+        }
+    }
+}
+
+@Preview(widthDp = 800, name = "Settings and microphone, tablet")
+@Composable
+private fun SessionSettingsWidePreview() = SessionSettingsAndMicrophone()
+
+@Preview(widthDp = 360, name = "Settings and microphone, phone")
+@Composable
+private fun SessionSettingsNarrowPreview() = SessionSettingsAndMicrophone()
+
+@Preview(widthDp = 800, name = "Settings of a Vocal-Free Track")
+@Composable
+private fun SessionSettingsVocalFreePreview() {
+    MeaVoxTheme {
+        Column(Modifier.padding(16.dp)) {
+            val content = previewContent(vocalFree = true)
+            SessionSettings(checkNotNull(content.track), content, SessionActions())
+        }
     }
 }
