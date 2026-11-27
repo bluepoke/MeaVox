@@ -4,6 +4,7 @@ package eu.schicht8.meavox.data
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import eu.schicht8.meavox.core.model.BackingChoice
+import eu.schicht8.meavox.core.model.CoverChoice
 import eu.schicht8.meavox.core.model.FailureKind
 import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
@@ -55,6 +56,8 @@ internal data class TrackEntity(
     @ColumnInfo(name = "cover_url") val coverUrl: String? = null,
     /** The Track's missing Cover Art was looked up after the fact (version 19, #50); false for Tracks from before. */
     @ColumnInfo(name = "cover_looked_up", defaultValue = "0") val coverLookedUp: Boolean = false,
+    /** Whose the Track's cover is (version 20, #51): `automatic`, `picked` or `removed`. */
+    @ColumnInfo(name = "cover_choice", defaultValue = AUTOMATIC) val coverChoice: String = AUTOMATIC,
 )
 
 internal fun Track.toEntity(addedAt: Long): TrackEntity {
@@ -79,6 +82,7 @@ internal fun Track.toEntity(addedAt: Long): TrackEntity {
         pipelinePreviousModel = pipelineColumns.previous,
         coverUrl = coverUrl,
         coverLookedUp = coverLookedUp,
+        coverChoice = coverChoice.toColumn(),
     )
 }
 
@@ -100,7 +104,21 @@ internal fun TrackEntity.toTrack() = Track(
     lastTranspose = Transpose.clamped(lastTranspose),
     coverUrl = coverUrl,
     coverLookedUp = coverLookedUp,
+    coverChoice = coverChoiceFromColumn(coverChoice),
 )
+
+private fun CoverChoice.toColumn(): String = when (this) {
+    CoverChoice.Automatic -> AUTOMATIC
+    CoverChoice.Picked -> "picked"
+    CoverChoice.Removed -> "removed"
+}
+
+private fun coverChoiceFromColumn(value: String): CoverChoice = when (value) {
+    AUTOMATIC -> CoverChoice.Automatic
+    "picked" -> CoverChoice.Picked
+    "removed" -> CoverChoice.Removed
+    else -> error("unknown cover choice '$value'")
+}
 
 private fun BackingChoice.toColumn(): String = when (this) {
     BackingChoice.Instrumental -> INSTRUMENTAL
@@ -194,6 +212,7 @@ private fun stepFromColumn(value: String): PipelineStep = when (value) {
     else -> error("unknown pipeline step '$value'")
 }
 
+private const val AUTOMATIC = "automatic"
 private const val INSTRUMENTAL = "instrumental"
 private const val ORIGINAL_AUDIO = "original_audio"
 private const val SEPARATING_PREFIX = "separating:"

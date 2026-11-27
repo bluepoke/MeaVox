@@ -3,6 +3,7 @@ package eu.schicht8.meavox.core.pipeline
 
 import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.library.TrackRepository
+import eu.schicht8.meavox.core.model.CoverChoice
 import eu.schicht8.meavox.core.model.FailureKind
 import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
@@ -99,9 +100,13 @@ class DownloadTrack(
 
     /** Stores the Source's picture as the Track's Cover Art, if it has one that can be downloaded. */
     private suspend fun downloadCover(id: TrackId) {
-        val url = tracks.get(id)?.coverUrl ?: return
+        val track = tracks.get(id) ?: return
+        if (track.coverChoice != CoverChoice.Automatic) return // picked or removed by the user (#51)
+        val url = track.coverUrl ?: return
         try {
-            files.storeCover(id, covers.download(url))
+            val cover = covers.download(url)
+            // Picked or removed while it downloaded (#51): the user's choice wins.
+            if (tracks.get(id)?.coverChoice == CoverChoice.Automatic) files.storeCover(id, cover)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

@@ -63,6 +63,11 @@ class AppTrackFiles(private val root: File) : TrackFiles {
         Unit
     }
 
+    override suspend fun deleteCover(track: TrackId) {
+        withContext(Dispatchers.IO) { coverOf(track).delete() }
+        changes.update { it + 1 }
+    }
+
     override suspend fun cover(track: TrackId): CoverArt? = withContext(Dispatchers.IO) {
         coverOf(track).takeIf { it.isFile }?.let { CoverArt(it.readBytes()) }
     }

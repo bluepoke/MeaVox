@@ -68,3 +68,13 @@ LGPL source offer the app and the README point to.
 - A cover's version is the time of change of its file, which `storeCover` makes strictly later than the cover it replaces, so a new
   cover is told from the old one without reading it. `TrackFiles.coversChanged` counts the covers stored and removed, so a cover
   stored while the Library is shown (with the download, by the job of #50, or chosen in a search) appears in its entry.
+
+## Note: cover search (#51, 2026-11-27)
+- The Track's screen shows its Cover Art left of the title and artist, and the cover search at the right edge of that header. The user can search there: MusicBrainz release groups (albums and singles) by title and artist,
+  prefilled from the Track as for the Lyrics search, with their front covers from the Cover Art Archive. Both are free and open and
+  need no key; requests to MusicBrainz name the app in the User-Agent and are spaced at least a second apart, as it asks. The client
+  is its own pure-Kotlin module, `coverart`.
+- A picked cover is stored like any Cover Art (from the 1200 px version if there is one, square, JPEG, at most 1000 px). Whose the
+  cover is, is kept per Track (`cover_choice`, Room version 20): **automatic**, **picked** or **removed**. Nothing found automatically
+  (the download, the job of #50) replaces a picked or removed cover; going back to the automatic one looks up the Source's picture
+  again, or the picture the imported file embeds. While the Source can't be reached, going back changes nothing and says so.

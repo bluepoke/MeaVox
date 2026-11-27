@@ -170,6 +170,7 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
     implementation(project(":separation"))
     implementation(project(":lyrics"))
+    implementation(project(":coverart"))
     // ADR 1: the NewPipe Sources ship in the network flavor only.
     "networkImplementation"(project(":newpipe"))
     coreLibraryDesugaring(libs.desugar.jdk.libs.nio)

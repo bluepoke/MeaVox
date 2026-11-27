@@ -77,7 +77,7 @@ enum class FailureKind {
 
     // Lyrics.
 
-    /** The Lyrics provider sent an answer that can't be read. */
+    /** The Lyrics provider (or the cover search, #51) sent an answer that can't be read. */
     AnswerUnreadable,
 
     /** Anything else; [FailureReason.detail] says what, as the error put it. Also a reason stored before #43. */

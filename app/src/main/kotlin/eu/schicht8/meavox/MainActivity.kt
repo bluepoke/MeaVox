@@ -36,6 +36,7 @@ import eu.schicht8.meavox.importing.PendingImport
 import eu.schicht8.meavox.importing.UriLocalFile
 import eu.schicht8.meavox.separation.SeparationCatalogue
 import eu.schicht8.meavox.ui.NotificationPermissionPrompt
+import eu.schicht8.meavox.ui.covers.CoverSearchRoute
 import eu.schicht8.meavox.ui.library.LibraryRoute
 import eu.schicht8.meavox.ui.licenses.LicensesRoute
 import eu.schicht8.meavox.ui.lyrics.LyricsSearchRoute
@@ -90,7 +91,7 @@ class MainActivity : ComponentActivity() {
                 NavHost(nav, startDestination = LIBRARY) {
                     composable(LIBRARY) {
                         LibraryRoute(
-                            container.library, container.libraryCovers, container.renameTrack, container.importer,
+                            container.library, container.coverImages, container.renameTrack, container.importer,
                             onPicked = ::askToImport,
                             onOpen = { nav.openTrack(it) },
                             onStorage = { nav.navigate(STORAGE) },
@@ -124,7 +125,9 @@ class MainActivity : ComponentActivity() {
                             id, container.trackRepository, container.sessions, container.trackPipeline,
                             container.lyricsRepository, container.matchLyrics, container.lyricsOffset, container.vocalFreeToggle,
                             container.modelChoices, container.mixes, container.exportMix, container.exportBacking,
+                            container.coverImages,
                             onChooseLyrics = { nav.navigate(route(LYRICS, id)) },
+                            onChooseCover = { nav.navigate(route(COVER, id)) },
                         )
                     }
                     composable(
@@ -134,6 +137,14 @@ class MainActivity : ComponentActivity() {
                         val args = checkNotNull(entry.arguments)
                         val id = TrackId(SourceId(checkNotNull(args.getString("source"))), checkNotNull(args.getString("id")))
                         LyricsSearchRoute(id, container.matchLyrics, onChosen = { nav.popBackStack() })
+                    }
+                    composable(
+                        COVER,
+                        arguments = listOf(navArgument("source") { type = NavType.StringType }, navArgument("id") { type = NavType.StringType }),
+                    ) { entry ->
+                        val args = checkNotNull(entry.arguments)
+                        val id = TrackId(SourceId(checkNotNull(args.getString("source"))), checkNotNull(args.getString("id")))
+                        CoverSearchRoute(id, container.coverSearch, container.chooseCover, onDone = { nav.popBackStack() })
                     }
                 }
                 // Cold start only, not for a song shared into MeaVox: the waveform that curls into
@@ -209,6 +220,7 @@ class MainActivity : ComponentActivity() {
         const val LICENSES = "licenses"
         const val TRACK = "track/{source}/{id}"
         const val LYRICS = "lyrics/{source}/{id}"
+        const val COVER = "cover/{source}/{id}"
 
         /** [pattern] (e.g. [LYRICS]) filled in for [id]. */
         fun route(pattern: String, id: TrackId) =

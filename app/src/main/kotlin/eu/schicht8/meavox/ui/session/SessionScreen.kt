@@ -126,8 +126,10 @@ import eu.schicht8.meavox.core.session.Session
 import eu.schicht8.meavox.core.session.SessionOutput
 import eu.schicht8.meavox.core.session.SessionState
 import eu.schicht8.meavox.core.session.Sessions
+import eu.schicht8.meavox.covers.CoverImages
 import eu.schicht8.meavox.separating.ModelChoices
 import eu.schicht8.meavox.ui.UiText
+import eu.schicht8.meavox.ui.covers.CoverTile
 import eu.schicht8.meavox.ui.formatTime
 import eu.schicht8.meavox.ui.label
 import eu.schicht8.meavox.ui.lyrics.KaraokeView
@@ -162,7 +164,9 @@ fun SessionRoute(
     mixes: Mixes,
     exportMix: ExportMix,
     exportBacking: ExportBacking,
+    covers: CoverImages,
     onChooseLyrics: () -> Unit,
+    onChooseCover: () -> Unit,
 ) {
     val viewModel: SessionViewModel = viewModel(
         factory = viewModelFactory {
@@ -241,6 +245,7 @@ fun SessionRoute(
     val output by viewModel.output.collectAsStateWithLifecycle()
     val latencyCorrection by viewModel.latencyCorrection.collectAsStateWithLifecycle()
     val guideVocalUnavailable by viewModel.guideVocalUnavailable.collectAsStateWithLifecycle()
+    val coverVersion by remember(id) { covers.versionOf(id) }.collectAsStateWithLifecycle(null)
     val mixes by viewModel.trackMixes.collectAsStateWithLifecycle()
     val backingExport by viewModel.backingExport.collectAsStateWithLifecycle()
     backingExport?.let { dialog ->
@@ -291,7 +296,9 @@ fun SessionRoute(
             output = output,
             latencyCorrection = latencyCorrection,
             guideVocalUnavailable = guideVocalUnavailable,
+            coverVersion = coverVersion,
         ),
+        covers = covers,
         actions = SessionActions(
             onTogglePlay = viewModel::togglePlay,
             onSeek = viewModel::seekTo,
@@ -316,6 +323,7 @@ fun SessionRoute(
             onRetry = viewModel::retry,
             onConfirmLyrics = viewModel::confirmLyrics,
             onChooseLyrics = onChooseLyrics,
+            onChooseCover = onChooseCover,
             onVocalFree = viewModel::setVocalFree,
             onReseparate = viewModel::startReseparating,
             onNewMix = viewModel::newMix,
@@ -405,6 +413,8 @@ data class SessionContent(
     /** The Guide Vocal in the headphones, 0..1, and why it can't be heard now, if it can't (#18). */
     val guideVocalLevel: Float = 0f,
     val guideVocalUnavailable: GuideVocalUnavailable? = null,
+    /** Which Cover Art the Track has ([eu.schicht8.meavox.core.library.TrackFiles.coverVersion]); null without one. */
+    val coverVersion: Long? = null,
     /** The Session's output, its round trip and Monitoring (#9); null until the Session is open. */
     val output: SessionOutput? = null,
     /** The Latency Correction of the Take in Review (#9). */
@@ -435,6 +445,8 @@ data class SessionActions(
     val onRetry: () -> Unit = {},
     val onConfirmLyrics: () -> Unit = {},
     val onChooseLyrics: () -> Unit = {},
+    /** Opens the cover search (#51). */
+    val onChooseCover: () -> Unit = {},
     val onVocalFree: (Boolean) -> Unit = {},
     val onReseparate: () -> Unit = {},
     val onNewMix: (TakeId) -> Unit = {},
@@ -457,9 +469,24 @@ fun SessionScreen(
     snackbar: SnackbarHostState,
     content: SessionContent,
     actions: SessionActions,
+    /** Where the cover next to the title comes from; null shows the placeholder only (previews). */
+    covers: CoverImages? = null,
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { TrackTitle(content.track) }) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    // The cover left of the title and artist, the way to the cover search at the right edge (#51).
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        content.track?.let { CoverTile(it.id, content.coverVersion, covers, HEADER_COVER_SIZE) }
+                        TrackTitle(content.track)
+                    }
+                },
+                actions = {
+                    if (content.track != null) TextButton(onClick = actions.onChooseCover) { Text(stringResource(R.string.session_cover_search)) }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         // Lyrics on top, a few lines tall; the Track's status and the Session's controls take the rest
@@ -520,6 +547,9 @@ internal fun SingleChoiceSegmentedButtonRowScope.Choice(
         icon = {},
     ) { Text(label) }
 }
+
+/** The size of the cover next to the Track's title (#51). */
+private val HEADER_COVER_SIZE = 40.dp
 
 /** The Track's title, with its artist below if known. */
 @Composable

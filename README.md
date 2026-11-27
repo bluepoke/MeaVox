@@ -20,7 +20,7 @@ It comes as two apps from this one code base ([ADR 24](docs/adr/0024-two-apps-me
 - **Transpose**: shift the key by ±6 semitones without changing the tempo, in real time.
 - **Lyrics**: fetched from [LRCLIB](https://lrclib.net), shown as pages or karaoke-style synced lines. Includes an offset adjustment and a tap-to-sync editor.
 - **Takes and mixing**: record many takes per song and mix them non-destructively, with levels, alignment nudge, a guide vocal and vocal effects (reverb, compression, high-pass).
-- **Export**: WAV, MP3 or M4A/AAC with tags, saved to `Music/MeaVox/` or shared.
+- **Export**: WAV, MP3 or M4A/AAC with tags and cover art, saved to `Music/MeaVox/` or shared. Covers come from the source or the imported file, or from a search on MusicBrainz.
 
 ## Architecture at a glance
 
@@ -39,6 +39,7 @@ Modules:
 - `data`: Room database and app-private file store, implementing the core's interfaces
 - `app`: Android application (UI, wiring), in two flavors: `local` builds **MeaVox** (Local File Source only, for Google Play) and `network` builds **MeaVox Max** (with the NewPipe Sources); see ADR 1 and ADR 24
 - `engine`: native Audio Engine (C++ via CMake and the NDK)
+- `coverart`: the `CoverSearch` in pure Kotlin: the cover search on MusicBrainz and the Cover Art Archive (#51)
 - `separation`: the `Separator` in pure Kotlin: the Separation Model catalogue and its download, DSP, and chunked Separation checkpointed per segment, on ONNX Runtime (ADR 15)
 - `spikes/*`: throwaway spikes that validate ADRs on hardware ([`audio-engine`](docs/spikes/audio-engine-spike.md), [`separation`](docs/spikes/separation-spike.md)); not shipped
 

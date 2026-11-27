@@ -4,6 +4,7 @@ package eu.schicht8.meavox
 import android.content.Context
 import androidx.work.WorkManager
 import eu.schicht8.meavox.core.export.ExportBacking
+import eu.schicht8.meavox.core.library.ChooseCover
 import eu.schicht8.meavox.core.library.FetchMissingCovers
 import eu.schicht8.meavox.core.library.ImportLocalFile
 import eu.schicht8.meavox.core.library.Library
@@ -29,15 +30,17 @@ import eu.schicht8.meavox.core.pipeline.SeparateTrack
 import eu.schicht8.meavox.core.pipeline.TrackPipeline
 import eu.schicht8.meavox.core.pipeline.VocalFreeToggle
 import eu.schicht8.meavox.core.port.AudioEngine
+import eu.schicht8.meavox.core.port.CoverSearch
 import eu.schicht8.meavox.core.port.LyricsProvider
 import eu.schicht8.meavox.core.port.Separator
 import eu.schicht8.meavox.core.port.Source
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.session.SettingsRepository
 import eu.schicht8.meavox.core.session.TakeRepository
+import eu.schicht8.meavox.coverart.MusicBrainzCoverSearch
 import eu.schicht8.meavox.covers.AndroidCoverArtLoader
 import eu.schicht8.meavox.covers.CoverWorker
-import eu.schicht8.meavox.covers.LibraryCovers
+import eu.schicht8.meavox.covers.CoverImages
 import eu.schicht8.meavox.data.AppTrackFiles
 import eu.schicht8.meavox.data.MeaVoxDatabase
 import eu.schicht8.meavox.data.RoomLyricsRepository
@@ -85,8 +88,8 @@ class AppContainer(private val context: Context) {
     val mixRepository: MixRepository by lazy { RoomMixRepository(database) }
 
     val library: Library by lazy { Library(trackRepository, takeRepository, trackFiles) }
-    /** The Cover Art the Library shows (#49), decoded once per cover while there is room. */
-    val libraryCovers: LibraryCovers by lazy { LibraryCovers(trackFiles) }
+    /** The Cover Art the Library and the Track's screen show (#49), decoded once per cover and size while there is room. */
+    val coverImages: CoverImages by lazy { CoverImages(trackFiles) }
     val renameTrack: RenameTrack by lazy { RenameTrack(trackRepository, lyricsRepository) }
     val trackStorage: TrackStorage by lazy {
         TrackStorage(trackRepository, takeRepository, mixRepository, trackFiles, pipelineJobs, SeparationCatalogue.models.map { it.id })
@@ -165,6 +168,13 @@ class AppContainer(private val context: Context) {
     }
     val fetchLyrics: FetchLyrics by lazy { FetchLyrics(trackRepository, lyricsRepository, lyricsProvider) }
     val matchLyrics: MatchLyrics by lazy { MatchLyrics(trackRepository, lyricsRepository, lyricsProvider) }
+
+    // Cover search (#51): MusicBrainz and the Cover Art Archive, in both apps.
+    val coverSearch: CoverSearch by lazy {
+        val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "dev"
+        MusicBrainzCoverSearch(MusicBrainzCoverSearch.userAgent(version))
+    }
+    val chooseCover: ChooseCover by lazy { ChooseCover(trackRepository, trackFiles, sources, coverArtLoader) }
     val lyricsOffset: LyricsOffset by lazy { LyricsOffset(lyricsRepository) }
     val lyricsPipeline: LyricsPipeline by lazy { LyricsPipeline(trackRepository, lyricsRepository, pipelineJobs) }
 }

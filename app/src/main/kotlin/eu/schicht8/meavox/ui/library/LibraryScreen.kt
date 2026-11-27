@@ -5,8 +5,6 @@ import android.net.Uri
 import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,19 +33,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -61,8 +53,9 @@ import eu.schicht8.meavox.core.library.LibraryEntry
 import eu.schicht8.meavox.core.library.RenameTrack
 import eu.schicht8.meavox.core.model.Track
 import eu.schicht8.meavox.core.model.TrackId
-import eu.schicht8.meavox.covers.LibraryCovers
+import eu.schicht8.meavox.covers.CoverImages
 import eu.schicht8.meavox.importing.Importer
+import eu.schicht8.meavox.ui.covers.CoverTile
 import eu.schicht8.meavox.ui.subtitle
 import eu.schicht8.meavox.ui.theme.MeaVoxButtonShape
 import eu.schicht8.meavox.ui.theme.MeaVoxTheme
@@ -70,7 +63,7 @@ import eu.schicht8.meavox.ui.theme.MeaVoxTheme
 @Composable
 fun LibraryRoute(
     library: Library,
-    covers: LibraryCovers,
+    covers: CoverImages,
     renameTrack: RenameTrack,
     importer: Importer,
     /** A file was picked: the import sheet asks how to add it (ADR 19). */
@@ -104,7 +97,7 @@ fun LibraryRoute(
 fun LibraryScreen(
     state: LibraryUiState,
     /** Where the rows' covers come from; null shows placeholders only (previews). */
-    covers: LibraryCovers? = null,
+    covers: CoverImages? = null,
     importing: Boolean = false,
     onImport: () -> Unit = {},
     onOpen: (TrackId) -> Unit = {},
@@ -174,7 +167,7 @@ private fun EmptyLibrary() {
 @Composable
 private fun TrackList(
     entries: List<LibraryEntry>,
-    covers: LibraryCovers?,
+    covers: CoverImages?,
     onOpen: (TrackId) -> Unit,
     onRename: (TrackId, String, String?) -> Unit,
 ) {
@@ -210,10 +203,10 @@ private fun TrackList(
 }
 
 @Composable
-private fun TrackRow(entry: LibraryEntry, covers: LibraryCovers?, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun TrackRow(entry: LibraryEntry, covers: CoverImages?, onClick: () -> Unit, onLongClick: () -> Unit) {
     ListItem(
         modifier = Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        leadingContent = { TrackCover(entry, covers) },
+        leadingContent = { CoverTile(entry.track.id, entry.coverVersion, covers, COVER_SIZE) },
         headlineContent = { Text(entry.track.title) },
         supportingContent = {
             Column {
@@ -228,35 +221,7 @@ private fun TrackRow(entry: LibraryEntry, covers: LibraryCovers?, onClick: () ->
     )
 }
 
-/** The Track's Cover Art as a small square (#49), or a placeholder of the same size without one. */
-@Composable
-private fun TrackCover(entry: LibraryEntry, covers: LibraryCovers?) {
-    val sizePx = with(LocalDensity.current) { COVER_SIZE.roundToPx() }
-    val version = entry.coverVersion
-    val image by produceState(version?.let { covers?.cached(entry.track.id, it) }, entry.track.id, version) {
-        value = if (version == null || covers == null) null else covers.load(entry.track.id, version, sizePx)
-    }
-    val shape = MaterialTheme.shapes.small
-    val noCover = stringResource(R.string.library_no_cover)
-    val shown = image
-    if (shown != null) {
-        Image(
-            shown,
-            contentDescription = stringResource(R.string.library_cover),
-            modifier = Modifier.size(COVER_SIZE).clip(shape),
-            contentScale = ContentScale.Crop,
-        )
-    } else {
-        Box(
-            Modifier.size(COVER_SIZE).clip(shape).background(MaterialTheme.colorScheme.surfaceVariant)
-                .semantics { contentDescription = noCover },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("♪", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
+/** The size of a Library row's cover (#49). */
 private val COVER_SIZE = 56.dp
 
 /** Edits a Track's title and artist; Rename stays disabled while the title is blank. */

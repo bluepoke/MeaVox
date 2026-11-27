@@ -77,6 +77,12 @@ class InMemoryTrackFiles : TrackFiles {
         changes.update { it + 1 }
     }
 
+    override suspend fun deleteCover(track: TrackId) {
+        covers.remove(track)
+        coverVersions.remove(track)
+        changes.update { it + 1 }
+    }
+
     override suspend fun cover(track: TrackId): CoverArt? = covers[track]
 
     override suspend fun coverVersion(track: TrackId): Long? = coverVersions[track]

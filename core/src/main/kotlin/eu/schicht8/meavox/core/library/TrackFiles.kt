@@ -25,6 +25,9 @@ interface TrackFiles {
     /** Stores [cover] as the Track's Cover Art (#42), replacing any it had. Deleted with the Track. */
     suspend fun storeCover(track: TrackId, cover: CoverArt)
 
+    /** Removes the Track's Cover Art, if it has one (#51). */
+    suspend fun deleteCover(track: TrackId)
+
     /** The Track's Cover Art, or null if it has none. */
     suspend fun cover(track: TrackId): CoverArt?
 

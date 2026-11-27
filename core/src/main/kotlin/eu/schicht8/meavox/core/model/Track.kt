@@ -44,6 +44,8 @@ data class Track(
      * with the certainty that there is none (item gone, no picture), so it isn't looked up again.
      */
     val coverLookedUp: Boolean = false,
+    /** Whose the Track's Cover Art is (#51): found automatically, or picked or removed by the user. */
+    val coverChoice: CoverChoice = CoverChoice.Automatic,
 ) {
     /**
      * The Separation Model whose Instrumental plays: the one the Track is Ready with, or while it is
@@ -92,6 +94,18 @@ data class Track(
             is TrackPipelineState.StemsDeleted -> true
             is TrackPipelineState.Failed -> pipeline.step != PipelineStep.Downloading
         }
+}
+
+/** Whose a Track's Cover Art is (#51). */
+enum class CoverChoice {
+    /** The Source's picture, or the one the imported file embeds, if there is one. */
+    Automatic,
+
+    /** Picked by the user in the cover search; nothing found automatically replaces it. */
+    Picked,
+
+    /** Removed by the user; nothing found automatically brings one back. */
+    Removed,
 }
 
 /** Why stems can't be deleted now (see [Track.stemsInUse]). */

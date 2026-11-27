@@ -7,6 +7,7 @@ import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.MixSettings
 import eu.schicht8.meavox.core.mix.VocalEffects
 import eu.schicht8.meavox.core.model.BackingChoice
+import eu.schicht8.meavox.core.model.CoverChoice
 import eu.schicht8.meavox.core.model.FailureKind
 import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.InputDevice
@@ -243,6 +244,7 @@ class MigratedDatabaseTest {
         }
         if (from < 18) assertNull(track.coverUrl, "$what has no picture to download, so its Exports have no Cover Art (#42)")
         if (from < 19) assertFalse(track.coverLookedUp, "$what hasn't had its missing cover looked up yet (#50)")
+        if (from < 20) assertEquals(CoverChoice.Automatic, track.coverChoice, "$what has its cover found automatically, as a new Track (#51)")
     }
 
     private fun trackRow(

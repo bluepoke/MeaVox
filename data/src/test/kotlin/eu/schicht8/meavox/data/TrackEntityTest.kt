@@ -2,6 +2,7 @@
 package eu.schicht8.meavox.data
 
 import eu.schicht8.meavox.core.model.BackingChoice
+import eu.schicht8.meavox.core.model.CoverChoice
 import eu.schicht8.meavox.core.model.FailureKind
 import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
@@ -127,6 +128,15 @@ class TrackEntityTest {
             val track = track(TrackPipelineState.Ready(model)).copy(coverLookedUp = checked)
 
             assertEquals(track, track.toEntity(addedAt = 1).toTrack(), "$checked")
+        }
+    }
+
+    @Test
+    fun `the Track's cover choice is stored and read back`() {
+        for (choice in CoverChoice.entries) {
+            val track = track(TrackPipelineState.Ready(model)).copy(coverChoice = choice)
+
+            assertEquals(track, track.toEntity(addedAt = 1).toTrack(), "$choice")
         }
     }
 }

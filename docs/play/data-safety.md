@@ -1,8 +1,8 @@
 # Data safety answers for MeaVox
 
 For the Play Console's Data safety form (App content → Data safety). Based on what the app sends
-(see [`privacy-policy.md`](privacy-policy.md)): the lyrics lookup at LRCLIB and the model downloads from
-GitHub. Check the answers against Google's current definitions before submitting
+(see [`privacy-policy.md`](privacy-policy.md)): the lyrics lookup at LRCLIB, the cover search at MusicBrainz
+and the Cover Art Archive, and the model downloads from GitHub. Check the answers against Google's current definitions before submitting
 (<https://support.google.com/googleplay/android-developer/answer/10787469>).
 
 ## Data collection and security
@@ -17,7 +17,7 @@ GitHub. Check the answers against Google's current definitions before submitting
 
 | Data type | Collected | Shared | Processing | Required or optional | Purpose |
 |---|---|---|---|---|---|
-| App activity → **In-app search history** (a song's title and artist, sent to LRCLIB to find its lyrics) | **Yes** | **No** | Ephemeral: used only to answer the request | Required (lyrics are looked up for every song; the user can't turn it off) | **App functionality** |
+| App activity → **In-app search history** (a song's title and artist, sent to LRCLIB to find its lyrics, and to MusicBrainz when the user searches for a cover) | **Yes** | **No** | Ephemeral: used only to answer the request | Required (lyrics are looked up for every song; the user can't turn it off; the cover search runs only when the user opens it) | **App functionality** |
 
 Every other data type: **not collected**, in particular:
 
@@ -31,7 +31,8 @@ Notes on the answers:
   the developer's service provider. The title and artist go to LRCLIB only to fetch the lyrics the user sees;
   if Google's reviewers count LRCLIB as a third party the data is shared with, change the answer to **Shared:
   Yes, App functionality**.
-- **Model downloads** from GitHub send no user data (a plain file download), so they add no data type.
+- **Model downloads** from GitHub and **cover pictures** from the Cover Art Archive send no user data (plain file
+  downloads), so they add no data type.
 - The singer's name (a setting) is written into exported files on the device and is never sent.
 
 ## Security practices

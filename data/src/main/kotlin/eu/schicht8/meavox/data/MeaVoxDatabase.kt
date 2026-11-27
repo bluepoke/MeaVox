@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [TrackEntity::class, TakeEntity::class, SettingEntity::class, LyricsEntity::class, LyricsOffsetEntity::class, MixEntity::class],
-    version = 19,
+    version = 20,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2), // 2: takes and settings tables (#8)
@@ -30,6 +30,7 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 16, to = 17), // 17: the Latency Correction each Take was kept with (#9)
         AutoMigration(from = 17, to = 18), // 18: where each Track's Cover Art is downloaded from (#42)
         AutoMigration(from = 18, to = 19), // 19: whether a Track's missing Cover Art was looked up after the fact (#50)
+        AutoMigration(from = 19, to = 20), // 20: whose each Track's cover is: automatic, picked or removed (#51)
     ],
 )
 abstract class MeaVoxDatabase : RoomDatabase() {
