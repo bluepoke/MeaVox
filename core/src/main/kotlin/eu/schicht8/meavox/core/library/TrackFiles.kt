@@ -8,6 +8,7 @@ import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.TakeId
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.port.Stems
+import kotlinx.coroutines.flow.StateFlow
 import java.io.InputStream
 
 /** Where a Track's audio files live in app-private storage (ADR 8). */
@@ -26,6 +27,18 @@ interface TrackFiles {
 
     /** The Track's Cover Art, or null if it has none. */
     suspend fun cover(track: TrackId): CoverArt?
+
+    /**
+     * Which picture the Track's Cover Art is, so that a new one can be told from the old one without
+     * reading it (#49): it changes whenever a cover is stored; null while the Track has none.
+     */
+    suspend fun coverVersion(track: TrackId): Long?
+
+    /**
+     * Counts the covers stored, and those removed with their Track, since the app started (#49): it
+     * changes after each, and a new collector gets its current value at once, so no change is missed.
+     */
+    val coversChanged: StateFlow<Long>
 
     /** Location for a kept Take's audio (mono FLAC, ADR 8). */
     fun take(track: TrackId, take: TakeId): AudioFile

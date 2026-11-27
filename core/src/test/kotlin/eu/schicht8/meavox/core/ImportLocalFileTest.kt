@@ -28,7 +28,7 @@ class ImportLocalFileTest {
     private val files = InMemoryTrackFiles()
     private val covers = FakeCoverArtLoader()
     private val import = ImportLocalFile(tracks, files, covers)
-    private val library = Library(tracks, InMemoryTakeRepository())
+    private val library = Library(tracks, InMemoryTakeRepository(), InMemoryTrackFiles())
 
     @Test
     fun `the picture an imported file embeds becomes the Track's Cover Art`() = runTest {

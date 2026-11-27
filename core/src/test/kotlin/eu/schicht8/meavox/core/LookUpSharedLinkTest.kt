@@ -6,6 +6,7 @@ import eu.schicht8.meavox.core.library.LookUpSharedLink
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.testing.FakeSource
 import eu.schicht8.meavox.core.testing.InMemoryTakeRepository
+import eu.schicht8.meavox.core.testing.InMemoryTrackFiles
 import eu.schicht8.meavox.core.testing.InMemoryTrackRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -15,7 +16,7 @@ import kotlin.test.assertNull
 
 class LookUpSharedLinkTest {
     private val tracks = InMemoryTrackRepository()
-    private val library = Library(tracks, InMemoryTakeRepository())
+    private val library = Library(tracks, InMemoryTakeRepository(), InMemoryTrackFiles())
     private val youtube = FakeSource(SourceId("youtube"))
     private val soundcloud = FakeSource(SourceId("soundcloud"))
     private val lookUp = LookUpSharedLink(listOf(youtube, soundcloud))

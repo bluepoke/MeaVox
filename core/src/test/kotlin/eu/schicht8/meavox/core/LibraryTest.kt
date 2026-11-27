@@ -5,6 +5,7 @@ import eu.schicht8.meavox.core.library.Library
 import eu.schicht8.meavox.core.library.LibraryEntry
 import eu.schicht8.meavox.core.library.RenameTrack
 import eu.schicht8.meavox.core.mix.Mixes
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -24,14 +25,20 @@ import eu.schicht8.meavox.core.testing.InMemoryTakeRepository
 import eu.schicht8.meavox.core.testing.InMemoryTrackFiles
 import eu.schicht8.meavox.core.testing.InMemoryTrackRepository
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class LibraryTest {
     private val tracks = InMemoryTrackRepository()
     private val takes = InMemoryTakeRepository()
-    private val library = Library(tracks, takes)
+    private val files = InMemoryTrackFiles()
+    private val library = Library(tracks, takes, files)
     private val source = FakeSource(SourceId("fake")).apply {
         add(sourceTrackId = "v1", title = "Fly Me to the Moon", artist = "Frank Sinatra", durationMs = 148_000)
     }
@@ -103,7 +110,6 @@ class LibraryTest {
         tracks.updatePipeline(sung.id, TrackPipelineState.Ready(SeparationModelId("fast")))
         takes.add(take("t1", sung.id))
         takes.add(take("t2", sung.id))
-        val files = InMemoryTrackFiles()
         val sessions = Sessions(tracks, takes, files, FakeAudioEngine(), InMemorySettingsRepository(), Mixes(tracks, takes, InMemoryMixRepository(), files, FakeLoudnessMeter()), clock = { SUNG_AT })
 
         sessions.open(sung.id, backgroundScope).apply {
@@ -119,6 +125,25 @@ class LibraryTest {
         assertEquals(SUNG_AT, entries[sung.id]?.track?.lastSessionAt)
         assertEquals(0, entries[other.id]?.takeCount)
         assertEquals(null, entries[other.id]?.track?.lastSessionAt)
+    }
+
+    @Test
+    fun `an entry says whether its Track has Cover Art, also for a cover stored while the Library is shown`() = runTest {
+        val track = library.add(source.search("fly me").single())
+        val shown = mutableListOf<Long?>()
+        val watching = launch { library.entries().collect { shown += it.single().coverVersion } }
+        runCurrent()
+
+        files.storeCover(track.id, CoverArt(byteArrayOf(1)))
+        runCurrent()
+        files.storeCover(track.id, CoverArt(byteArrayOf(2)))
+        runCurrent()
+        watching.cancel()
+
+        assertEquals(3, shown.size, "$shown")
+        assertNull(shown[0], "no cover yet")
+        assertNotNull(shown[1], "the first cover")
+        assertNotEquals(shown[1], shown[2], "a new cover is a new version, so the Library shows it")
     }
 
     private fun take(id: String, track: TrackId) =

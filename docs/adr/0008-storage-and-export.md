@@ -61,3 +61,10 @@ LGPL source offer the app and the README point to.
   audio). A Track is looked up for good (`cover_looked_up`, Room version 19) once it has a cover or it's certain there is none: its
   item is gone, it has no picture, or the picture isn't there. A connection or extractor failure is retried with backoff and at later
   starts. It never touches the Track Pipeline.
+
+## Note: covers in the Library (#49, 2026-11-27)
+- Each Library entry starts with the Track's Cover Art as a 56 dp square, or a placeholder of the same size. The covers are decoded
+  off the main thread, scaled to the row's size and kept in a small cache.
+- A cover's version is the time of change of its file, which `storeCover` makes strictly later than the cover it replaces, so a new
+  cover is told from the old one without reading it. `TrackFiles.coversChanged` counts the covers stored and removed, so a cover
+  stored while the Library is shown (with the download, by the job of #50, or chosen in a search) appears in its entry.

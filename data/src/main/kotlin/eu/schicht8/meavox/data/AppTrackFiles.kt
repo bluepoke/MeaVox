@@ -11,6 +11,9 @@ import eu.schicht8.meavox.core.model.TakeId
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.port.Stems
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -43,6 +46,7 @@ class AppTrackFiles(private val root: File) : TrackFiles {
 
     override suspend fun storeCover(track: TrackId, cover: CoverArt) = withContext(Dispatchers.IO) {
         val target = coverOf(track)
+        val previous = target.lastModified() // 0 without one
         target.parentFile?.mkdirs()
         // Written beside it first, so a cover is never read half-written.
         val part = File(target.path + ".part")
@@ -51,11 +55,26 @@ class AppTrackFiles(private val root: File) : TrackFiles {
             part.delete()
             throw IOException("could not move $part to $target")
         }
+        // Its time of change is its version (see coverVersion): strictly later than the cover it replaces,
+        // also when both are stored within the same millisecond. Should the file system refuse, the time
+        // the file was written stays, which tells covers apart unless two land in one millisecond.
+        target.setLastModified(maxOf(System.currentTimeMillis(), previous + 1))
+        changes.update { it + 1 }
+        Unit
     }
 
     override suspend fun cover(track: TrackId): CoverArt? = withContext(Dispatchers.IO) {
         coverOf(track).takeIf { it.isFile }?.let { CoverArt(it.readBytes()) }
     }
+
+    // Each stored cover gets a later time of change than the one before (see storeCover).
+    override suspend fun coverVersion(track: TrackId): Long? = withContext(Dispatchers.IO) {
+        coverOf(track).takeIf { it.isFile }?.lastModified()
+    }
+
+    private val changes = MutableStateFlow(0L)
+
+    override val coversChanged: StateFlow<Long> = changes
 
     override fun take(track: TrackId, take: TakeId): AudioFile =
         AudioFile(File(dirOf(track), "takes/${hash(take.value)}.flac").path)
@@ -122,6 +141,7 @@ class AppTrackFiles(private val root: File) : TrackFiles {
 
     override suspend fun deleteAll(track: TrackId) {
         withContext(Dispatchers.IO) { dirOf(track).deleteRecursively() }
+        changes.update { it + 1 }
     }
 
     override suspend fun deleteAllExcept(keep: Set<TrackId>) {
@@ -130,6 +150,7 @@ class AppTrackFiles(private val root: File) : TrackFiles {
             // Hidden directories (staging) are not Tracks.
             root.listFiles { f -> f.isDirectory && !f.name.startsWith(".") && f.name !in kept }?.forEach { it.deleteRecursively() }
         }
+        changes.update { it + 1 }
     }
 
     private fun dirOf(track: TrackId): File = File(root, hash(track.key))

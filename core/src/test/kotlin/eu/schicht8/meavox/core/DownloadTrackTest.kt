@@ -31,7 +31,7 @@ class DownloadTrackTest {
     private val downloader = FakeMediaDownloader(files)
     private val covers = FakeCoverArtLoader()
     private val download = DownloadTrack(tracks, files, listOf(youtube), downloader, covers)
-    private val library = Library(tracks, InMemoryTakeRepository())
+    private val library = Library(tracks, InMemoryTakeRepository(), InMemoryTrackFiles())
 
     @Test
     fun `an added Track's audio is downloaded and kept as its Original Audio`() = runTest {

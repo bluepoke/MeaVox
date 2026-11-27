@@ -124,6 +124,8 @@
     <string name="settings_title">Einstellungen</string>
     <string name="library_import_file">Datei importieren</string>
     <string name="library_empty">Noch keine Songs</string>
+    <string name="library_cover">Cover</string>
+    <string name="library_no_cover">Kein Cover</string>
     <string name="library_empty_hint">Importiere eine Audio- oder Videodatei, oder teile eine aus einer anderen App mit MeaVox.</string>
     <string name="action_rename">Umbenennen</string>
     <string name="library_rename_title">Song umbenennen</string>

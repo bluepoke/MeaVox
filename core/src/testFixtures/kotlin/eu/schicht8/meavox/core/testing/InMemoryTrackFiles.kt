@@ -10,6 +10,9 @@ import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.TakeId
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.port.Stems
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import java.io.InputStream
 import java.security.MessageDigest
 
@@ -64,12 +67,21 @@ class InMemoryTrackFiles : TrackFiles {
         AppDirectory("/mem/${track.key}/${model.value}/checkpoint")
 
     private val covers = mutableMapOf<TrackId, CoverArt>()
+    private val coverVersions = mutableMapOf<TrackId, Long>()
+    private var nextCoverVersion = 1L
+    private val changes = MutableStateFlow(0L)
 
     override suspend fun storeCover(track: TrackId, cover: CoverArt) {
         covers[track] = cover
+        coverVersions[track] = nextCoverVersion++
+        changes.update { it + 1 }
     }
 
     override suspend fun cover(track: TrackId): CoverArt? = covers[track]
+
+    override suspend fun coverVersion(track: TrackId): Long? = coverVersions[track]
+
+    override val coversChanged: StateFlow<Long> = changes
 
     override fun take(track: TrackId, take: TakeId) = AudioFile("/mem/${track.key}/takes/${take.value}")
 
@@ -124,12 +136,16 @@ class InMemoryTrackFiles : TrackFiles {
     override suspend fun deleteAllExcept(keep: Set<TrackId>) {
         val kept = keep.map { "/mem/${it.key}/" }
         covers.keys.retainAll(keep)
+        coverVersions.keys.retainAll(keep)
+        changes.update { it + 1 }
         sizes.keys.removeAll { path -> path.startsWith("/mem/") && !path.startsWith("/mem/staging/") && kept.none(path::startsWith) }
     }
 
     override suspend fun deleteAll(track: TrackId) {
         originals.remove(track)
         covers.remove(track)
+        coverVersions.remove(track)
+        changes.update { it + 1 }
         sizes.keys.removeAll { it.startsWith("/mem/${track.key}/") }
         deleted += track
     }

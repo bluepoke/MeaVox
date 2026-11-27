@@ -37,6 +37,7 @@ import eu.schicht8.meavox.core.session.SettingsRepository
 import eu.schicht8.meavox.core.session.TakeRepository
 import eu.schicht8.meavox.covers.AndroidCoverArtLoader
 import eu.schicht8.meavox.covers.CoverWorker
+import eu.schicht8.meavox.covers.LibraryCovers
 import eu.schicht8.meavox.data.AppTrackFiles
 import eu.schicht8.meavox.data.MeaVoxDatabase
 import eu.schicht8.meavox.data.RoomLyricsRepository
@@ -83,7 +84,9 @@ class AppContainer(private val context: Context) {
     val settingsRepository: SettingsRepository by lazy { RoomSettingsRepository(database) }
     val mixRepository: MixRepository by lazy { RoomMixRepository(database) }
 
-    val library: Library by lazy { Library(trackRepository, takeRepository) }
+    val library: Library by lazy { Library(trackRepository, takeRepository, trackFiles) }
+    /** The Cover Art the Library shows (#49), decoded once per cover while there is room. */
+    val libraryCovers: LibraryCovers by lazy { LibraryCovers(trackFiles) }
     val renameTrack: RenameTrack by lazy { RenameTrack(trackRepository, lyricsRepository) }
     val trackStorage: TrackStorage by lazy {
         TrackStorage(trackRepository, takeRepository, mixRepository, trackFiles, pipelineJobs, SeparationCatalogue.models.map { it.id })

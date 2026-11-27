@@ -196,7 +196,7 @@ class TrackPipelineTest {
     @Test
     fun `a search result added Vocal-Free is downloaded and then becomes Ready without Separating`() = runTest {
         startPipeline()
-        val library = Library(tracks, InMemoryTakeRepository())
+        val library = Library(tracks, InMemoryTakeRepository(), InMemoryTrackFiles())
         val source = FakeSource(youtube).apply { add(sourceTrackId = "karaoke", title = "Fly Me to the Moon (Karaoke)") }
 
         val track = library.add(source.search("karaoke").single(), vocalFree = true)
@@ -289,7 +289,7 @@ class TrackPipelineTest {
         startPipeline()
         val file = FakeLocalFile(displayName = "song.mp3", content = "audio-1")
         val first = import(file)
-        val library = Library(tracks, InMemoryTakeRepository())
+        val library = Library(tracks, InMemoryTakeRepository(), InMemoryTrackFiles())
         val source = FakeSource(youtube).apply { add(sourceTrackId = "v1", title = "Song") }
         val found = library.add(source.search("song").single())
 
