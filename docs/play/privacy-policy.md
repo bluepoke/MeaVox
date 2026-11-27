@@ -1,6 +1,6 @@
 # Privacy policy for MeaVox
 
-_Last updated: 27 November 2026 (cover search)_
+_Last updated: 27 November 2026 (cover search, title suggestions)_
 
 MeaVox is a karaoke and singing-practice app for Android, developed as free software under the GNU GPL,
 version 3 or later (<https://github.com/bluepoke/MeaVox>). This policy covers the MeaVox app
@@ -10,8 +10,8 @@ version 3 or later (<https://github.com/bluepoke/MeaVox>). This policy covers th
 
 MeaVox has no account, no ads, no analytics and no tracking. The developer collects no data about
 you. Your songs, recordings and settings stay on your device. The app connects to the internet only
-to look up lyrics, to search for cover art when you ask it to, and to download the vocal removal
-models.
+to look up lyrics, to suggest a song's title and artist when you add it, to search for cover art
+when you ask it to, and to download the vocal removal models.
 
 ## What stays on your device
 
@@ -33,6 +33,10 @@ you delete them.
   them, or as you type them in a lyrics search) to LRCLIB (<https://lrclib.net>), a free lyrics
   service. Requests name the app and its version. No other information about you or your device is
   sent. LRCLIB's own terms and privacy practices apply to these requests.
+- **Title suggestions**: when you add a song, the app suggests its title and artist, cleaned from the
+  file's name or tags, and checks that suggestion against MusicBrainz (<https://musicbrainz.org>), an
+  open music database: it sends the suggested title and artist there. You can change both before
+  adding the song.
 - **Cover art search**: when you search for a song's cover, the app sends the title and artist
   (prefilled from the song, as you may edit them) to MusicBrainz (<https://musicbrainz.org>), an open
   music database, and loads the covers it finds from the Cover Art Archive (<https://coverartarchive.org>,
@@ -48,7 +52,8 @@ All connections use HTTPS. The app sends no device identifiers, no location and 
 ## Permissions
 
 - **Microphone** (`RECORD_AUDIO`): to record your singing. Asked for when you first record.
-- **Internet** (`INTERNET`): for the lyrics, the cover search and the model downloads above.
+- **Internet** (`INTERNET`): for the lyrics, the title suggestions, the cover search and the model
+  downloads above.
 - **Notifications** (`POST_NOTIFICATIONS`) and **foreground services** (`FOREGROUND_SERVICE`,
   `FOREGROUND_SERVICE_DATA_SYNC`, `FOREGROUND_SERVICE_MEDIA_PROCESSING`): to show the progress of
   vocal removal while it runs in the background.

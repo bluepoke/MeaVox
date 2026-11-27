@@ -131,6 +131,8 @@
     <string name="model_about_minutes">etwa %1$d Min. für diesen Song</string>
     <string name="import_no_vocals">Ohne Gesang</string>
     <string name="import_no_vocals_hint">Etwa eine Karaoke-Version: Die Gesangsentfernung wird übersprungen.</string>
+    <string name="import_title">Titel</string>
+    <string name="import_artist">Interpret</string>
     <string name="import_vocal_removal">Gesangsentfernung</string>
     <string name="library_title">Bibliothek</string>
     <string name="settings_title">Einstellungen</string>

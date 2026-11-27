@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.content.IntentCompat
@@ -109,7 +110,7 @@ class MainActivity : ComponentActivity() {
                         StorageRoute(container.trackStorage, SeparationCatalogue.models.associate { it.id to it.name })
                     }
                     composable(SEARCH) {
-                        SearchRoute(container.sources, container.library, container.modelChoices, onAdded = { nav.openTrack(it) })
+                        SearchRoute(container.sources, container.library, container.modelChoices, container.titleSuggestions, onAdded = { nav.openTrack(it) })
                     }
                     composable(
                         TRACK,
@@ -186,20 +187,30 @@ class MainActivity : ComponentActivity() {
         val dismiss = { container.pendingImport.value = null }
         when (val import = pending) {
             null -> Unit
-            is PendingImport.File -> ImportSheet(import, import.name, null, null, container.modelChoices, onDismiss = dismiss, onAdd = { vocalFree, model ->
-                dismiss()
-                container.importer.import(import.uri, vocalFree, model)
-            })
+            is PendingImport.File -> ImportSheet(
+                import,
+                import.name,
+                null,
+                null,
+                remember(import) { container.titleSuggestions.forFile(import.uri, import.name) },
+                container.modelChoices,
+                onDismiss = dismiss,
+                onAdd = { title, artist, vocalFree, model ->
+                    dismiss()
+                    container.importer.import(import.uri, title, artist, vocalFree, model)
+                },
+            )
             is PendingImport.Link -> ImportSheet(
                 import,
                 import.candidate.title,
                 import.candidate.artist,
                 import.candidate.durationMs,
+                remember(import) { container.titleSuggestions.forSource(import.candidate) },
                 container.modelChoices,
                 onDismiss = dismiss,
-                onAdd = { vocalFree, model ->
+                onAdd = { title, artist, vocalFree, model ->
                     dismiss()
-                    container.linkImporter.add(import.candidate, vocalFree, model)
+                    container.linkImporter.add(import.candidate, title, artist, vocalFree, model)
                 },
             )
         }

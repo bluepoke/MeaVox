@@ -54,12 +54,15 @@ class Importer(
         scope.launch(queue) { files.discardAbandonedStaging() }
     }
 
-    /** Imports [uri] as the import sheet asked: marked [vocalFree] (ADR 14), or to be separated with [model] (ADR 19). */
-    fun import(uri: Uri, vocalFree: Boolean, model: SeparationModelId?) {
+    /**
+     * Imports [uri] as the import sheet asked: with [title] and [artist] (#52), marked [vocalFree]
+     * (ADR 14), or to be separated with [model] (ADR 19).
+     */
+    fun import(uri: Uri, title: String, artist: String?, vocalFree: Boolean, model: SeparationModelId?) {
         running.update { it + 1 }
         scope.launch(queue) {
             val result = try {
-                Result.Imported(importLocalFile(UriLocalFile(resolver, uri), vocalFree, model).id)
+                Result.Imported(importLocalFile(UriLocalFile(resolver, uri), vocalFree, model, title, artist).id)
             } catch (e: Exception) {
                 Result.Failed(e.text())
             } finally {

@@ -13,7 +13,7 @@ object TitleCleaner {
     /** Words that only describe the upload, in the languages common on music videos. */
     private const val CLUTTER_WORDS =
         "official|offizielle?s?|oficial|officiel(le)?|video|videoclip|musikvideo|audio|lyrics?|letra|paroles|songtext|" +
-            "music|clip|visuali[sz]er|hd|hq|4k|8k|1080p|720p|remaster(ed)?|mv|m/v|explicit|\\d{4}"
+            "music|clip|visuali[sz]er|hd|hq|4k|8k|1080p|720p|remaster(ed)?|upgrade|mv|m/v|explicit|\\d{4}"
     private const val SEPARATORS = """[\s\-–—/|,&+]"""
     private val bracketed = Regex("""\s*[(\[【]([^)\]】]*)[)\]】]""")
     private val clutterGroup = Regex("""^$SEPARATORS*(($CLUTTER_WORDS)$SEPARATORS*)+$""", RegexOption.IGNORE_CASE)

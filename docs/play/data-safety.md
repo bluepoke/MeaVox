@@ -1,8 +1,8 @@
 # Data safety answers for MeaVox
 
 For the Play Console's Data safety form (App content → Data safety). Based on what the app sends
-(see [`privacy-policy.md`](privacy-policy.md)): the lyrics lookup at LRCLIB, the cover search at MusicBrainz
-and the Cover Art Archive, and the model downloads from GitHub. Check the answers against Google's current definitions before submitting
+(see [`privacy-policy.md`](privacy-policy.md)): the lyrics lookup at LRCLIB, the title check and the cover
+search at MusicBrainz, the covers from the Cover Art Archive, and the model downloads from GitHub. Check the answers against Google's current definitions before submitting
 (<https://support.google.com/googleplay/android-developer/answer/10787469>).
 
 ## Data collection and security
@@ -17,7 +17,7 @@ and the Cover Art Archive, and the model downloads from GitHub. Check the answer
 
 | Data type | Collected | Shared | Processing | Required or optional | Purpose |
 |---|---|---|---|---|---|
-| App activity → **In-app search history** (a song's title and artist, sent to LRCLIB to find its lyrics, and to MusicBrainz when the user searches for a cover) | **Yes** | **No** | Ephemeral: used only to answer the request | Required (lyrics are looked up for every song; the user can't turn it off; the cover search runs only when the user opens it) | **App functionality** |
+| App activity → **In-app search history** (a song's title and artist, sent to LRCLIB to find its lyrics, and to MusicBrainz when a song is added, to check its suggested title and artist, and when the user searches for a cover) | **Yes** | **No** | Ephemeral: used only to answer the request | Required (lyrics are looked up and the title is checked for every song added; the user can't turn it off; the cover search runs only when the user opens it) | **App functionality** |
 
 Every other data type: **not collected**, in particular:
 

@@ -4,6 +4,7 @@ package eu.schicht8.meavox.coverart
 import eu.schicht8.meavox.core.model.FailureKind
 import eu.schicht8.meavox.core.port.CoverCandidate
 import eu.schicht8.meavox.core.port.CoverSearchUnavailable
+import eu.schicht8.meavox.core.port.RecordingMatch
 import java.io.IOException
 import java.net.URI
 import java.net.URLDecoder
@@ -16,19 +17,19 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 
 /**
- * Seam 1 of #51: the cover search on MusicBrainz and the Cover Art Archive, against responses recorded
- * from musicbrainz.org (`src/test/resources/musicbrainz/`).
+ * The MusicBrainz client: the cover search of #51 (with the Cover Art Archive) and the recording lookup
+ * of #52, against responses recorded from musicbrainz.org (`src/test/resources/musicbrainz/`).
  */
-class MusicBrainzCoverSearchTest {
+class MusicBrainzClientTest {
     private class RecordedHttp(private val status: Int = 200, private val fixture: String? = null, private val fail: IOException? = null) :
-        MusicBrainzCoverSearch.Http {
+        MusicBrainzClient.Http {
         val requests = mutableListOf<Pair<String, String>>()
 
-        override fun get(url: String, userAgent: String): MusicBrainzCoverSearch.Response {
+        override fun get(url: String, userAgent: String): MusicBrainzClient.Response {
             requests += url to userAgent
             fail?.let { throw it }
             val body = fixture?.let { checkNotNull(javaClass.getResource("/musicbrainz/$it")).readText() } ?: ""
-            return MusicBrainzCoverSearch.Response(status, body)
+            return MusicBrainzClient.Response(status, body)
         }
     }
 
@@ -37,7 +38,7 @@ class MusicBrainzCoverSearchTest {
         k to URLDecoder.decode(v, Charsets.UTF_8)
     }
 
-    private fun search(http: RecordedHttp) = MusicBrainzCoverSearch(MusicBrainzCoverSearch.userAgent("0.1.0"), http, now = { 0L })
+    private fun search(http: RecordedHttp) = MusicBrainzClient(MusicBrainzClient.userAgent("0.1.0"), http, now = { 0L })
 
     @Test
     fun `searches release groups by title and artist and identifies the app`() = runTest {
@@ -115,11 +116,11 @@ class MusicBrainzCoverSearchTest {
     @Test
     fun `searches right after each other reach MusicBrainz at most once a second`() = runTest {
         val sentAt = mutableListOf<Long>()
-        val http = MusicBrainzCoverSearch.Http { _, _ ->
+        val http = MusicBrainzClient.Http { _, _ ->
             sentAt += testScheduler.currentTime
-            MusicBrainzCoverSearch.Response(200, """{"release-groups":[]}""")
+            MusicBrainzClient.Response(200, """{"release-groups":[]}""")
         }
-        val search = MusicBrainzCoverSearch(MusicBrainzCoverSearch.userAgent("0.1.0"), http, now = { testScheduler.currentTime })
+        val search = MusicBrainzClient(MusicBrainzClient.userAgent("0.1.0"), http, now = { testScheduler.currentTime })
 
         search.search("Bad", null)
         search.search("Thriller", null)
@@ -129,5 +130,38 @@ class MusicBrainzCoverSearchTest {
         together.awaitAll()
 
         assertEquals(listOf(0L, 1_000L, 3_500L, 4_500L, 5_500L), sentAt)
+    }
+
+    @Test
+    fun `looks up recordings by title and artist, each with its artist credit and score`() = runTest {
+        val http = RecordedHttp(fixture = "recordings-in-the-air-tonight.json")
+
+        val found = search(http).recordings("In The Air Tonight", "Phil Collins")
+
+        val (url, userAgent) = http.requests.single()
+        assertEquals("https://musicbrainz.org/ws/2/recording", url.substringBefore('?'))
+        assertEquals(
+            mapOf("query" to "recording:\"In The Air Tonight\" AND artist:\"Phil Collins\"", "fmt" to "json", "limit" to "10"),
+            params(url),
+        )
+        assertEquals("MeaVox/0.1.0 ( https://github.com/bluepoke/MeaVox )", userAgent)
+        assertEquals(10, found.size)
+        assertEquals(RecordingMatch("In the Air Tonight", "Phil Collins", 100), found.first())
+    }
+
+    @Test
+    fun `the cover search and the recording lookup share the one request a second`() = runTest {
+        val sentAt = mutableListOf<Long>()
+        val http = MusicBrainzClient.Http { url, _ ->
+            sentAt += testScheduler.currentTime
+            MusicBrainzClient.Response(200, if ("/recording" in url) """{"recordings":[]}""" else """{"release-groups":[]}""")
+        }
+        val client = MusicBrainzClient(MusicBrainzClient.userAgent("0.1.0"), http, now = { testScheduler.currentTime })
+
+        client.search("Bad", null)
+        client.recordings("Bad", "Michael Jackson")
+        client.search("Thriller", null)
+
+        assertEquals(listOf(0L, 1_000L, 2_000L), sentAt)
     }
 }

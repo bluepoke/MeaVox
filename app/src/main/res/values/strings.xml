@@ -140,6 +140,8 @@
     <string name="model_about_minutes">about %1$d min for this song</string>
     <string name="import_no_vocals">No vocals (Vocal-Free)</string>
     <string name="import_no_vocals_hint">E.g. a karaoke version: vocal removal is skipped.</string>
+    <string name="import_title">Title</string>
+    <string name="import_artist">Artist</string>
     <string name="import_vocal_removal">Vocal removal</string>
     <string name="library_title">Library</string>
     <string name="settings_title">Settings</string>

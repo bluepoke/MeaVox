@@ -34,6 +34,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -56,13 +57,17 @@ import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.port.MediaUnavailable
 import eu.schicht8.meavox.core.port.Source
 import eu.schicht8.meavox.core.port.SourceCandidate
+import eu.schicht8.meavox.importing.TitleSuggestions
 import eu.schicht8.meavox.separating.ModelChoices
 import eu.schicht8.meavox.ui.UiText
 import eu.schicht8.meavox.ui.formatTime
 import eu.schicht8.meavox.ui.models.ImportChoice
 import eu.schicht8.meavox.ui.models.ImportOptions
+import eu.schicht8.meavox.ui.models.NameFields
+import eu.schicht8.meavox.ui.models.NameInputs
 import eu.schicht8.meavox.ui.models.importLabel
 import eu.schicht8.meavox.ui.models.rememberImportChoice
+import eu.schicht8.meavox.ui.models.rememberNameFields
 import eu.schicht8.meavox.ui.resolve
 import eu.schicht8.meavox.ui.text
 import kotlinx.coroutines.CancellationException
@@ -156,20 +161,20 @@ class SearchViewModel(private val sources: List<Source>, private val library: Li
     fun onBackground() = player.pause()
 
     /**
-     * Adds [candidate], marked Vocal-Free if [vocalFree] (ADR 14), else to be separated with [model]
-     * (ADR 19); an existing Track opens unchanged.
+     * Adds [candidate] with the [title] and [artist] the user settled on (#52), marked Vocal-Free if
+     * [vocalFree] (ADR 14), else to be separated with [model] (ADR 19); an existing Track opens unchanged.
      */
-    fun add(candidate: SourceCandidate, vocalFree: Boolean, model: SeparationModelId?, then: (TrackId) -> Unit) {
+    fun add(candidate: SourceCandidate, title: String, artist: String?, vocalFree: Boolean, model: SeparationModelId?, then: (TrackId) -> Unit) {
         resolving?.cancel()
         player.stop()
-        viewModelScope.launch { then(library.add(candidate, vocalFree, model).id) }
+        viewModelScope.launch { then(library.add(candidate, vocalFree, model, title, artist).id) }
     }
 
     override fun onCleared() = player.stop()
 }
 
 @Composable
-fun SearchRoute(sources: List<Source>, library: Library, choices: ModelChoices, onAdded: (TrackId) -> Unit) {
+fun SearchRoute(sources: List<Source>, library: Library, choices: ModelChoices, suggestions: TitleSuggestions, onAdded: (TrackId) -> Unit) {
     val viewModel: SearchViewModel = viewModel(factory = viewModelFactory { initializer { SearchViewModel(sources, library) } })
     val query by viewModel.query.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
@@ -198,7 +203,8 @@ fun SearchRoute(sources: List<Source>, library: Library, choices: ModelChoices, 
             player = playing,
             onTogglePlay = viewModel.player::toggle,
             choice = rememberImportChoice(choices, key = candidate),
-            onAdd = { vocalFree, model -> viewModel.add(candidate, vocalFree, model, onAdded) },
+            names = rememberNameFields(candidate, remember(candidate) { suggestions.forSource(candidate) }),
+            onAdd = { title, artist, vocalFree, model -> viewModel.add(candidate, title, artist, vocalFree, model, onAdded) },
             onDismiss = viewModel::closePreview,
         )
     }
@@ -269,7 +275,9 @@ private fun PreviewSheet(
     onTogglePlay: () -> Unit,
     /** The import options (ADR 14, ADR 19): "No vocals" and the model, pre-selected to the default. */
     choice: ImportChoice,
-    onAdd: (vocalFree: Boolean, model: SeparationModelId?) -> Unit,
+    /** The editable title and artist (#52), with their suggestion. */
+    names: NameFields,
+    onAdd: (title: String, artist: String?, vocalFree: Boolean, model: SeparationModelId?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     // Fully open: the import options and the add button show without dragging the sheet up.
@@ -293,9 +301,13 @@ private fun PreviewSheet(
                     enabled = player == PreviewPlayer.State.Playing || player == PreviewPlayer.State.Paused,
                 ) { Text(stringResource(if (player == PreviewPlayer.State.Playing) R.string.action_pause else R.string.action_play)) }
             }
+            NameInputs(names)
             ImportOptions(choice, candidate.durationMs)
             // Adding with the defaults stays one tap (ADR 19).
-            Button(onClick = { onAdd(choice.vocalFree, choice.model.takeUnless { choice.vocalFree }) }, enabled = choice.loaded) {
+            Button(
+                onClick = { onAdd(names.addedTitle, names.addedArtist, choice.vocalFree, choice.model.takeUnless { choice.vocalFree }) },
+                enabled = choice.loaded && names.canAdd,
+            ) {
                 Text(importLabel(choice))
             }
             Spacer(Modifier.height(16.dp))

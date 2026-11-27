@@ -37,15 +37,22 @@ class Library(private val tracks: TrackRepository, private val takes: TakeReposi
     suspend fun contains(id: TrackId): Boolean = tracks.get(id) != null
 
     /**
-     * Adds a Source search result as a new Track in the [TrackPipelineState.Added] state, marked
-     * [vocalFree] if asked, to be separated with [separationModel] once downloaded (ADR 19). If
-     * the same Source item was added before, returns that Track unchanged (ADR 10, ADR 14).
+     * Adds a Source search result as a new Track in the [TrackPipelineState.Added] state, with the
+     * [title] and [artist] the user settled on (#52; the Source's by default), marked [vocalFree] if
+     * asked, to be separated with [separationModel] once downloaded (ADR 19). If the same Source item
+     * was added before, returns that Track unchanged (ADR 10, ADR 14).
      */
-    suspend fun add(candidate: SourceCandidate, vocalFree: Boolean = false, separationModel: SeparationModelId? = null): Track {
+    suspend fun add(
+        candidate: SourceCandidate,
+        vocalFree: Boolean = false,
+        separationModel: SeparationModelId? = null,
+        title: String = candidate.title,
+        artist: String? = candidate.artist,
+    ): Track {
         val track = Track(
             id = candidate.id,
-            title = candidate.title,
-            artist = candidate.artist,
+            title = title.trim().ifEmpty { candidate.title },
+            artist = artist?.trim()?.ifEmpty { null },
             durationMs = candidate.durationMs,
             pipeline = TrackPipelineState.Added,
             vocalFree = vocalFree,

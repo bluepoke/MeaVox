@@ -39,7 +39,7 @@ Modules:
 - `data`: Room database and app-private file store, implementing the core's interfaces
 - `app`: Android application (UI, wiring), in two flavors: `local` builds **MeaVox** (Local File Source only, for Google Play) and `network` builds **MeaVox Max** (with the NewPipe Sources); see ADR 1 and ADR 24
 - `engine`: native Audio Engine (C++ via CMake and the NDK)
-- `coverart`: the `CoverSearch` in pure Kotlin: the cover search on MusicBrainz and the Cover Art Archive (#51)
+- `coverart`: MusicBrainz in pure Kotlin: the `CoverSearch` (with the Cover Art Archive, #51) and the `RecordingLookup` that checks a song's title and artist when it is added (#52)
 - `separation`: the `Separator` in pure Kotlin: the Separation Model catalogue and its download, DSP, and chunked Separation checkpointed per segment, on ONNX Runtime (ADR 15)
 - `spikes/*`: throwaway spikes that validate ADRs on hardware ([`audio-engine`](docs/spikes/audio-engine-spike.md), [`separation`](docs/spikes/separation-spike.md)); not shipped
 

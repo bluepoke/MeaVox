@@ -17,17 +17,24 @@ import kotlinx.coroutines.CancellationException
  */
 class ImportLocalFile(private val tracks: TrackRepository, private val files: TrackFiles, private val covers: CoverArtLoader) {
     /**
-     * Imports [file], marked [vocalFree] if asked, to be separated with [separationModel] (ADR 19);
+     * Imports [file] with the [title] and [artist] the user settled on (#52; by default its file name
+     * and none), marked [vocalFree] if asked, to be separated with [separationModel] (ADR 19);
      * content imported before keeps its Track unchanged (ADR 14).
      */
-    suspend operator fun invoke(file: LocalFile, vocalFree: Boolean = false, separationModel: SeparationModelId? = null): Track {
+    suspend operator fun invoke(
+        file: LocalFile,
+        vocalFree: Boolean = false,
+        separationModel: SeparationModelId? = null,
+        title: String? = null,
+        artist: String? = null,
+    ): Track {
         val staged = file.open().use { files.stage(it) }
         val id = TrackId(SourceId.Local, staged.sha256)
         val track = tracks.addIfAbsent(
             Track(
                 id = id,
-                title = titleFrom(file.displayName),
-                artist = null,
+                title = title?.trim()?.ifEmpty { null } ?: titleFrom(file.displayName),
+                artist = artist?.trim()?.ifEmpty { null },
                 durationMs = null,
                 pipeline = TrackPipelineState.Added,
                 vocalFree = vocalFree,

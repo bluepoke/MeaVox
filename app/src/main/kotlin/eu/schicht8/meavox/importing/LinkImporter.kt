@@ -58,9 +58,12 @@ class LinkImporter(
         }
     }
 
-    /** Adds [candidate] as the import sheet asked: marked [vocalFree] (ADR 14), or to be separated with [model] (ADR 19). */
-    fun add(candidate: SourceCandidate, vocalFree: Boolean, model: SeparationModelId?) {
-        report(R.string.link_cant_add) { Result.Added(library.add(candidate, vocalFree, model).id) }
+    /**
+     * Adds [candidate] as the import sheet asked: with [title] and [artist] (#52), marked [vocalFree]
+     * (ADR 14), or to be separated with [model] (ADR 19).
+     */
+    fun add(candidate: SourceCandidate, title: String, artist: String?, vocalFree: Boolean, model: SeparationModelId?) {
+        report(R.string.link_cant_add) { Result.Added(library.add(candidate, vocalFree, model, title, artist).id) }
     }
 
     private fun report(@StringRes failure: Int, block: suspend () -> Result) {

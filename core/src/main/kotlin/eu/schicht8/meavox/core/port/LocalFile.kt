@@ -14,3 +14,6 @@ interface LocalFile {
     /** Opens the content for reading. The caller closes the stream. */
     fun open(): InputStream
 }
+
+/** The title and artist an audio or video file carries in its own tags, if any (#52). */
+data class FileTags(val title: String?, val artist: String?)

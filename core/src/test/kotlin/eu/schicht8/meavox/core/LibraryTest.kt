@@ -62,6 +62,16 @@ class LibraryTest {
     }
 
     @Test
+    fun `a search result is added with the title and artist the user settled on`() = runTest {
+        val candidate = source.add("v3", "Phil Collins - In The Air Tonight (Official Music Video)", artist = "PhilCollinsVEVO")
+
+        val track = library.add(candidate, title = "In The Air Tonight", artist = "Phil Collins")
+
+        assertEquals("In The Air Tonight", tracks.get(track.id)?.title)
+        assertEquals("Phil Collins", tracks.get(track.id)?.artist)
+    }
+
+    @Test
     fun `a new Library has no Tracks`() = runTest {
         assertEquals(emptyList(), library.tracks().first())
     }

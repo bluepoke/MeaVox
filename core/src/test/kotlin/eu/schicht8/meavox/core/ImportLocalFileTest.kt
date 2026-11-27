@@ -62,6 +62,23 @@ class ImportLocalFileTest {
     }
 
     @Test
+    fun `an imported file is added with the title and artist the user settled on`() = runTest {
+        val track = import(FakeLocalFile(displayName = "02 - my_way (live).mp3", content = "audio-1"), title = "My Way", artist = "Frank Sinatra")
+
+        assertEquals("My Way", track.title)
+        assertEquals("Frank Sinatra", track.artist)
+    }
+
+    @Test
+    fun `content imported before keeps its Track as it is, whatever names are given`() = runTest {
+        val first = import(FakeLocalFile(displayName = "take-five.flac", content = "audio-1"), title = "Take Five", artist = "Dave Brubeck")
+
+        val again = import(FakeLocalFile(displayName = "copy.flac", content = "audio-1"), title = "Other", artist = "Someone")
+
+        assertEquals(first, again)
+    }
+
+    @Test
     fun `an imported file keeps the Separation Model chosen for it`() = runTest {
         val best = SeparationModelId("best")
 

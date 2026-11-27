@@ -11,6 +11,7 @@ import eu.schicht8.meavox.core.library.Library
 import eu.schicht8.meavox.core.library.LookUpSharedLink
 import eu.schicht8.meavox.core.library.RenameTrack
 import eu.schicht8.meavox.core.library.SquareCovers
+import eu.schicht8.meavox.core.library.SuggestTitle
 import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.library.TrackRepository
 import eu.schicht8.meavox.core.library.TrackStorage
@@ -37,7 +38,7 @@ import eu.schicht8.meavox.core.port.Source
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.session.SettingsRepository
 import eu.schicht8.meavox.core.session.TakeRepository
-import eu.schicht8.meavox.coverart.MusicBrainzCoverSearch
+import eu.schicht8.meavox.coverart.MusicBrainzClient
 import eu.schicht8.meavox.covers.AndroidCoverArtLoader
 import eu.schicht8.meavox.covers.CoverWorker
 import eu.schicht8.meavox.covers.CoverImages
@@ -56,6 +57,7 @@ import eu.schicht8.meavox.export.MediaStoreExports
 import eu.schicht8.meavox.importing.Importer
 import eu.schicht8.meavox.importing.LinkImporter
 import eu.schicht8.meavox.importing.PendingImport
+import eu.schicht8.meavox.importing.TitleSuggestions
 import eu.schicht8.meavox.lyrics.LrclibProvider
 import eu.schicht8.meavox.separating.EngineDecoder
 import eu.schicht8.meavox.separating.EngineFlac
@@ -169,11 +171,15 @@ class AppContainer(private val context: Context) {
     val fetchLyrics: FetchLyrics by lazy { FetchLyrics(trackRepository, lyricsRepository, lyricsProvider) }
     val matchLyrics: MatchLyrics by lazy { MatchLyrics(trackRepository, lyricsRepository, lyricsProvider) }
 
-    // Cover search (#51): MusicBrainz and the Cover Art Archive, in both apps.
-    val coverSearch: CoverSearch by lazy {
+    // MusicBrainz, in both apps: the cover search (#51, with the Cover Art Archive) and the check of the
+    // title and artist suggested when a song is added (#52), one client so they share its request limit.
+    private val musicBrainz: MusicBrainzClient by lazy {
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "dev"
-        MusicBrainzCoverSearch(MusicBrainzCoverSearch.userAgent(version))
+        MusicBrainzClient(MusicBrainzClient.userAgent(version))
     }
+    val coverSearch: CoverSearch get() = musicBrainz
+    /** The title and artist the import sheet suggests (#52). */
+    val titleSuggestions: TitleSuggestions by lazy { TitleSuggestions(context, SuggestTitle(musicBrainz)) }
     val chooseCover: ChooseCover by lazy { ChooseCover(trackRepository, trackFiles, sources, coverArtLoader) }
     val lyricsOffset: LyricsOffset by lazy { LyricsOffset(lyricsRepository) }
     val lyricsPipeline: LyricsPipeline by lazy { LyricsPipeline(trackRepository, lyricsRepository, pipelineJobs) }

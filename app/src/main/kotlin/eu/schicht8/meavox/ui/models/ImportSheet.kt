@@ -23,39 +23,44 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import eu.schicht8.meavox.R
 import eu.schicht8.meavox.core.model.SeparationModelId
+import eu.schicht8.meavox.importing.TitleSuggestion
 import eu.schicht8.meavox.separating.ModelChoices
 import eu.schicht8.meavox.ui.theme.MeaVoxButtonShape
 
 /**
- * The import sheet for a picked or shared file, or a shared link (ADR 19): the song's [title], the
+ * The import sheet for a picked or shared file, or a shared link (ADR 19): what it is ([source], e.g.
+ * the file name or the video's title), its editable title and artist with a [suggestion] (#52), the
  * "No vocals" option and the model picker. Confirming without changing anything adds it with the
- * Default Separation Model, in one tap.
+ * suggestion and the Default Separation Model, in one tap.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImportSheet(
     /** The pending import; each new one starts with the defaults. */
     key: Any,
-    title: String,
+    source: String,
     details: String?,
     durationMs: Long?,
+    suggestion: TitleSuggestion,
     choices: ModelChoices,
-    onAdd: (vocalFree: Boolean, model: SeparationModelId?) -> Unit,
+    onAdd: (title: String, artist: String?, vocalFree: Boolean, model: SeparationModelId?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val choice = rememberImportChoice(choices, key)
+    val names = rememberNameFields(key, suggestion)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(source, style = MaterialTheme.typography.titleMedium)
             details?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            NameInputs(names)
             ImportOptions(choice, durationMs)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = { onAdd(choice.vocalFree, choice.model.takeUnless { choice.vocalFree }) },
-                    enabled = choice.loaded,
+                    onClick = { onAdd(names.addedTitle, names.addedArtist, choice.vocalFree, choice.model.takeUnless { choice.vocalFree }) },
+                    enabled = choice.loaded && names.canAdd,
                     shape = MeaVoxButtonShape,
                 ) { Text(importLabel(choice)) }
                 TextButton(onClick = onDismiss, shape = MeaVoxButtonShape) { Text(stringResource(R.string.action_cancel)) }

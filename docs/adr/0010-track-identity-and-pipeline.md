@@ -27,6 +27,15 @@ A Track re-separated after it was Ready keeps its previous model while the new o
 ## Note: notification permission (#27)
 On Android 13+ the progress notification needs the `POST_NOTIFICATIONS` permission. MeaVox asks for it once, when a Track is first `Separating` (with a short explanation first), not at app start. If the user declines, the steps still run as foreground jobs, but their notification stays hidden until notifications are allowed in the system settings; the Library and the Track's screen show the progress either way. The app doesn't ask again.
 
+## Note: a Track's title and artist when it is added (#52, 2026-11-27)
+The import sheet (search result, shared link, picked or shared file, ADR 19) now also has editable **Title** and **Artist** fields, and the
+Track is added with what they hold. They start with a suggestion: the Source's title and artist (e.g. a video's title and channel)
+cleaned with `TitleCleaner`, or a file's own tags, or its cleaned file name (without a leading track number). Then the suggestion is
+checked against MusicBrainz recordings (the client of #51, sharing its User-Agent and its one request a second): a recording replaces
+it, in the fields the user hasn't edited and only while the title is untouched, only when it is clearly the same song (score of 90 or more, the same title and artist ignoring
+case, accents and punctuation; without an artist, only when every match of that title has the same artist). Offline or without such a
+match the cleaned suggestion stays, and adding never waits for MusicBrainz (only, for a file, for its tags). Adding with the suggestion stays one tap.
+
 ## Consequences
 - Pipeline steps must be idempotent and keyed by Track ID (and Separation Model).
 - The pipeline state is persisted in Room and is the single source of truth for the UI.
