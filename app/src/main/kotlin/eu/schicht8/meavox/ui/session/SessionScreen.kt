@@ -64,12 +64,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -849,13 +851,7 @@ private fun loopHint(loop: PracticeLoop?): String {
 private fun Transport(state: SessionState, playback: Playback, reviewBackingDb: Float, correction: LatencyCorrection?, actions: SessionActions) {
     when (state) {
         SessionState.Idle -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NeutralOutlinedButton(
-                stringResource(if (playback.playing) R.string.action_pause else R.string.action_play),
-                actions.onTogglePlay,
-                Modifier.height(TRANSPORT_HEIGHT),
-                style = transportLabel(),
-                horizontalPadding = 20.dp,
-            )
+            PlayPauseButton(playback.playing, actions.onTogglePlay)
             RecordButton(stringResource(R.string.session_record_from, formatTime(playback.positionMs)), actions.onRecord, Modifier.weight(1f))
         }
         is SessionState.CountingDown -> Row(
@@ -992,6 +988,64 @@ internal fun StepButton(symbol: String, description: String, enabled: Boolean, o
         contentPadding = PaddingValues(0.dp),
         modifier = Modifier.size(44.dp).semantics { contentDescription = description },
     ) { Text(symbol, fontSize = 20.sp) }
+}
+
+/**
+ * Play and Pause of free playback: green with a triangle to play, gold with two bars while playing. Both
+ * labels are laid over each other, the hidden one only keeping its width, so the button never changes size.
+ */
+@Composable
+private fun PlayPauseButton(playing: Boolean, onClick: () -> Unit) {
+    val container = if (playing) MaterialTheme.colorScheme.primary else MeaVoxTheme.colors.play
+    val content = if (playing) MaterialTheme.colorScheme.onPrimary else MeaVoxTheme.colors.onPlay
+    Button(
+        onClick = onClick,
+        shape = MeaVoxButtonShape,
+        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = content),
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        modifier = Modifier.height(TRANSPORT_HEIGHT),
+    ) {
+        Box(contentAlignment = Alignment.CenterStart) {
+            PlayPauseLabel(pause = false, content, Modifier.shownIf(!playing))
+            PlayPauseLabel(pause = true, content, Modifier.shownIf(playing))
+        }
+    }
+}
+
+/** Visible and announced when [shown]; otherwise it only takes up its space. */
+private fun Modifier.shownIf(shown: Boolean): Modifier = if (shown) this else alpha(0f).clearAndSetSemantics {}
+
+@Composable
+private fun PlayPauseLabel(pause: Boolean, color: Color, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (pause) PauseSymbol(color) else PlaySymbol(color)
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(if (pause) R.string.action_pause else R.string.action_play), style = transportLabel(), fontWeight = FontWeight.Bold)
+    }
+}
+
+/** A triangle pointing right, the size of the Record button's dot. */
+@Composable
+private fun PlaySymbol(color: Color) {
+    Canvas(Modifier.size(12.dp)) {
+        drawPath(
+            Path().apply {
+                moveTo(size.width * 0.1f, 0f)
+                lineTo(size.width, size.height / 2)
+                lineTo(size.width * 0.1f, size.height)
+                close()
+            },
+            color,
+        )
+    }
+}
+
+/** Two upright bars, the size of the Record button's dot. */
+@Composable
+private fun PauseSymbol(color: Color) {
+    Row(Modifier.size(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        repeat(2) { Box(Modifier.width(4.dp).fillMaxHeight().background(color)) }
+    }
 }
 
 /** The wide Record button: red, with the Start Position in its label (ADR 9). */

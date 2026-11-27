@@ -24,12 +24,14 @@ internal object MeaVoxPalette {
     val GoldDeep = Color(0xFFC8941F)
     val OnGold = Color(0xFF141109)
     val Record = Color(0xFFEF5350)
+    /** The Play button: a green between Gold and Record in lightness, so the three transport colours sit together. */
+    val Play = Color(0xFF5FC48A)
     val RecordSoft = Color(0xFF3D2020)
 }
 
 /**
  * Material 3 roles. Contrast (WCAG): Ink on every surface ≥ 11:1, InkMuted ≥ 5.9:1,
- * Gold as text ≥ 7.7:1, OnGold on Gold 10:1, Record as text ≥ 5.2:1 on Bg and Surface.
+ * Gold as text ≥ 7.7:1, OnGold on Gold 10:1, Record as text ≥ 5.2:1 on Bg and Surface, OnGold on Play 8.8:1.
  * Line (outlineVariant) is decoration only; control borders use outline (InkMuted).
  */
 internal val MeaVoxColorScheme: ColorScheme = with(MeaVoxPalette) {
@@ -88,6 +90,10 @@ data class MeaVoxExtraColors(
     val inkFaint: Color,
     /** Pressed primary button; track under gold progress. */
     val goldDeep: Color,
+    /** The Play button of free playback (its Pause is gold). */
+    val play: Color,
+    /** Text and icons on [play]. */
+    val onPlay: Color,
 )
 
 internal val MeaVoxExtraColorsDark = with(MeaVoxPalette) {
@@ -97,5 +103,7 @@ internal val MeaVoxExtraColorsDark = with(MeaVoxPalette) {
         recordSoft = RecordSoft,
         inkFaint = InkFaint,
         goldDeep = GoldDeep,
+        play = Play,
+        onPlay = OnGold,
     )
 }
