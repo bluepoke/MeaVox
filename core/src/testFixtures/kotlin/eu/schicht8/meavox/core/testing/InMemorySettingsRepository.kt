@@ -62,6 +62,14 @@ class InMemorySettingsRepository : SettingsRepository {
         notificationPermissionAsked = true
     }
 
+    private var coversSquared = false
+
+    override suspend fun coversSquared(): Boolean = coversSquared
+
+    override suspend fun setCoversSquared() {
+        coversSquared = true
+    }
+
     private var singerName: String? = null
 
     override suspend fun singerName(): String? = singerName

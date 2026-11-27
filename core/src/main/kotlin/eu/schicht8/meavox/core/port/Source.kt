@@ -21,6 +21,12 @@ interface Source {
 
     /** Where the media for [sourceTrackId] can be read from right now (stream URL or file). */
     suspend fun resolve(sourceTrackId: String): ResolvedMedia
+
+    /**
+     * Where the largest picture of [sourceTrackId] is, as [SourceCandidate.coverUrl] has it, or null if
+     * it has none (#50). Needs no downloadable audio. Throws [MediaUnavailable] like [resolve].
+     */
+    suspend fun coverUrl(sourceTrackId: String): String?
 }
 
 /** One search result of a [Source]. */

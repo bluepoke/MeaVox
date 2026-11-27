@@ -39,6 +39,11 @@ data class Track(
      * Audio (#42). Null for imported files, which bring their own, and for Tracks added before.
      */
     val coverUrl: String? = null,
+    /**
+     * The Track's missing Cover Art was looked up after the fact (#50), with a cover as the result or
+     * with the certainty that there is none (item gone, no picture), so it isn't looked up again.
+     */
+    val coverLookedUp: Boolean = false,
 ) {
     /**
      * The Separation Model whose Instrumental plays: the one the Track is Ready with, or while it is

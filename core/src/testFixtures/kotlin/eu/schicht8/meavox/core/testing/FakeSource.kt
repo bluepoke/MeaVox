@@ -47,4 +47,16 @@ class FakeSource(override val id: SourceId) : Source {
         require(catalogue.any { it.id.sourceTrackId == sourceTrackId }) { "unknown $sourceTrackId" }
         return ResolvedMedia(audioUri = audioUriOf(sourceTrackId), audioKey = audioKey, videoUri = null)
     }
+
+    /** The source IDs [coverUrl] was asked for, in order. */
+    val coversAskedFor = mutableListOf<String>()
+
+    /** Thrown by [coverUrl] while set. */
+    var coverFailure: Exception? = null
+
+    override suspend fun coverUrl(sourceTrackId: String): String? {
+        coversAskedFor += sourceTrackId
+        coverFailure?.let { throw it }
+        return requireNotNull(catalogue.firstOrNull { it.id.sourceTrackId == sourceTrackId }) { "unknown $sourceTrackId" }.coverUrl
+    }
 }

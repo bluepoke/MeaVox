@@ -50,3 +50,14 @@ LAME 3.100 is no longer downloaded at build time: the parts of the release tarba
 `third_party/lame-3.100/` (provenance and how to check them in `third_party/lame-3.100.md`), so the build fetches nothing, as
 F-Droid requires (ADR 24). It is still built as its own `libmp3lame.so` and linked dynamically; the vendored source is the
 LGPL source offer the app and the README point to.
+
+## Note: square covers, and covers for older Tracks (#50, 2026-11-27)
+- Every picture that becomes Cover Art is **cropped to a centred square** (still a JPEG of at most 1000 px), whatever it comes from:
+  players and the Library show covers square, and a video's picture is 16:9. The covers stored before were cropped once, at the
+  first start after #50 (a setting remembers it); covers that were already square stay as they are.
+- Network Tracks without Cover Art (those added before #42, and those whose picture couldn't be downloaded) get it from a WorkManager
+  job queued at every app start of MeaVox Max, once there is a network: where the picture is comes from the Track's `coverUrl`, or
+  else (also when the kept one is gone) from its Source (`Source.coverUrl`, the item's largest picture; it needs no downloadable
+  audio). A Track is looked up for good (`cover_looked_up`, Room version 19) once it has a cover or it's certain there is none: its
+  item is gone, it has no picture, or the picture isn't there. A connection or extractor failure is retried with backoff and at later
+  starts. It never touches the Track Pipeline.

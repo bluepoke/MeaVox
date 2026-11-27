@@ -20,5 +20,10 @@ class MeaVoxApp : Application() {
         container.appScope.launch { container.lyricsPipeline.run() }
         // Files a job wrote after its Track was deleted (#20).
         container.appScope.launch { container.trackStorage.removeOrphanedFiles() }
+        // Square covers, also for the ones stored before #50; then the covers older network Tracks lack.
+        container.appScope.launch {
+            container.squareCovers()
+            container.queueMissingCovers()
+        }
     }
 }

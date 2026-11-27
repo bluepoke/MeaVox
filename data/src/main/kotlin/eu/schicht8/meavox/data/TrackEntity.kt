@@ -53,6 +53,8 @@ internal data class TrackEntity(
     @ColumnInfo(name = "pipeline_previous_model") val pipelinePreviousModel: String? = null,
     /** Where the Source's picture of the Track is, downloaded as its Cover Art (version 18, #42); null for Tracks from before. */
     @ColumnInfo(name = "cover_url") val coverUrl: String? = null,
+    /** The Track's missing Cover Art was looked up after the fact (version 19, #50); false for Tracks from before. */
+    @ColumnInfo(name = "cover_looked_up", defaultValue = "0") val coverLookedUp: Boolean = false,
 )
 
 internal fun Track.toEntity(addedAt: Long): TrackEntity {
@@ -76,6 +78,7 @@ internal fun Track.toEntity(addedAt: Long): TrackEntity {
         lastTranspose = lastTranspose.semitones,
         pipelinePreviousModel = pipelineColumns.previous,
         coverUrl = coverUrl,
+        coverLookedUp = coverLookedUp,
     )
 }
 
@@ -96,6 +99,7 @@ internal fun TrackEntity.toTrack() = Track(
     separationModel = separationModel?.let(::SeparationModelId),
     lastTranspose = Transpose.clamped(lastTranspose),
     coverUrl = coverUrl,
+    coverLookedUp = coverLookedUp,
 )
 
 private fun BackingChoice.toColumn(): String = when (this) {

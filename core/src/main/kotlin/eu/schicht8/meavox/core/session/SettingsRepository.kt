@@ -46,6 +46,11 @@ interface SettingsRepository {
 
     suspend fun setNotificationPermissionAsked()
 
+    /** Whether the Cover Art stored before #50 was cropped to squares (see [eu.schicht8.meavox.core.library.SquareCovers]); false until it was. */
+    suspend fun coversSquared(): Boolean
+
+    suspend fun setCoversSquared()
+
     /** The singer's name, which Mix Exports are tagged with ("<artist> feat. <name>", #15); null until set. */
     suspend fun singerName(): String?
 

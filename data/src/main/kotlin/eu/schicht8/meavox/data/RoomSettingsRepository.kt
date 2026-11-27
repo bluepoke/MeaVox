@@ -66,6 +66,10 @@ class RoomSettingsRepository(database: MeaVoxDatabase) : SettingsRepository {
 
     override suspend fun setNotificationPermissionAsked() = dao.put(SettingEntity(NOTIFICATION_PERMISSION_ASKED, true.toString()))
 
+    override suspend fun coversSquared(): Boolean = dao.get(COVERS_SQUARED)?.toBooleanStrictOrNull() ?: false
+
+    override suspend fun setCoversSquared() = dao.put(SettingEntity(COVERS_SQUARED, true.toString()))
+
     override suspend fun singerName(): String? = dao.get(SINGER_NAME)?.takeIf { it.isNotBlank() }
 
     // Cleared as an empty value, so no delete is needed.
@@ -91,6 +95,7 @@ class RoomSettingsRepository(database: MeaVoxDatabase) : SettingsRepository {
         const val REVIEW_BACKING = "review_backing_db"
         const val DEFAULT_SEPARATION_MODEL = "default_separation_model"
         const val NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
+        const val COVERS_SQUARED = "covers_squared"
         const val SINGER_NAME = "singer_name"
     }
 }

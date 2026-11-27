@@ -3,22 +3,26 @@ package eu.schicht8.meavox.covers
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
 import android.media.MediaMetadataRetriever
 import eu.schicht8.meavox.core.model.AudioFile
 import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.port.CoverArtLoader
+import eu.schicht8.meavox.core.port.NoPicture
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
-import kotlin.math.max
-import kotlin.math.roundToInt
+import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 
 /**
- * [CoverArtLoader] over HTTP and the platform's image decoders (#42). Every picture is decoded and
- * written again as a JPEG of at most [MAX_EDGE] pixels on its longer side: an MP4 `covr` item only
+ * [CoverArtLoader] over HTTP and the platform's image decoders (#42). Every picture is decoded,
+ * cropped to a centred square (#50: players and the Library show covers square, a video's thumbnail
+ * is 16:9) and written again as a JPEG of at most [MAX_EDGE] pixels a side: an MP4 `covr` item only
  * takes JPEG or PNG, Sources also serve WebP, and an Export shouldn't carry a picture bigger than a
  * player shows.
  */
@@ -28,13 +32,16 @@ class AndroidCoverArtLoader : CoverArtLoader {
         val bytes = try {
             connection.connectTimeout = 20_000
             connection.readTimeout = 30_000
-            val status = connection.responseCode
-            if (status != 200) throw IOException("HTTP $status for the picture")
+            when (val status = connection.responseCode) {
+                200 -> Unit
+                404, 410 -> throw NoPicture("no picture at $url (HTTP $status)")
+                else -> throw IOException("HTTP $status for the picture")
+            }
             connection.inputStream.use { it.readAtMost(MAX_DOWNLOAD_BYTES) }
         } finally {
             connection.disconnect()
         }
-        toJpeg(bytes) ?: throw IOException("the picture at $url can't be decoded")
+        toJpeg(bytes) ?: throw NoPicture("the picture at $url can't be decoded")
     }
 
     override suspend fun embeddedIn(audio: AudioFile): CoverArt? = runInterruptible(Dispatchers.IO) {
@@ -49,7 +56,16 @@ class AndroidCoverArtLoader : CoverArtLoader {
         }
     }
 
-    /** [bytes] as a JPEG no larger than [MAX_EDGE], or null if they aren't a picture or don't fit in memory. */
+    override suspend fun square(cover: CoverArt): CoverArt = runInterruptible(Dispatchers.IO) {
+        val bytes = cover.jpeg
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        // Already square and small enough (e.g. an MP3's front cover): not encoded once more.
+        if (bounds.outWidth > 0 && bounds.outWidth == bounds.outHeight && bounds.outWidth <= MAX_EDGE) return@runInterruptible cover
+        toJpeg(bytes) ?: throw NoPicture("the stored cover can't be decoded")
+    }
+
+    /** [bytes] as a square JPEG no larger than [MAX_EDGE], or null if they aren't a picture or don't fit in memory. */
     private fun toJpeg(bytes: ByteArray): CoverArt? = try {
         encodeJpeg(bytes)
     } catch (_: OutOfMemoryError) {
@@ -60,16 +76,26 @@ class AndroidCoverArtLoader : CoverArtLoader {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        // Decoded at a power-of-two fraction first, so a huge picture never takes a huge bitmap.
+        // Decoded at a power-of-two fraction first, so a huge picture never takes a huge bitmap; the
+        // shorter side is what the square keeps.
         var sample = 1
-        while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_EDGE) sample *= 2
+        while (min(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_EDGE) sample *= 2
         val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
             ?: return null
-        val scale = MAX_EDGE.toFloat() / max(decoded.width, decoded.height)
-        val bitmap = if (scale < 1f) {
-            Bitmap.createScaledBitmap(decoded, (decoded.width * scale).roundToInt(), (decoded.height * scale).roundToInt(), true)
-        } else {
+        val side = min(decoded.width, decoded.height)
+        val size = min(side, MAX_EDGE)
+        // The centred square, scaled to [size] in one step.
+        val left = (decoded.width - side) / 2
+        val top = (decoded.height - side) / 2
+        val crop = Rect(left, top, left + side, top + side)
+        val bitmap = if (crop.left == 0 && crop.top == 0 && size == side) {
             decoded
+        } else {
+            Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { square ->
+                Canvas(square).drawBitmap(
+                    decoded, crop, Rect(0, 0, size, size), Paint(Paint.FILTER_BITMAP_FLAG),
+                )
+            }
         }
         try {
             val out = ByteArrayOutputStream()

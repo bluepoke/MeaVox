@@ -4,10 +4,12 @@ package eu.schicht8.meavox
 import android.content.Context
 import androidx.work.WorkManager
 import eu.schicht8.meavox.core.export.ExportBacking
+import eu.schicht8.meavox.core.library.FetchMissingCovers
 import eu.schicht8.meavox.core.library.ImportLocalFile
 import eu.schicht8.meavox.core.library.Library
 import eu.schicht8.meavox.core.library.LookUpSharedLink
 import eu.schicht8.meavox.core.library.RenameTrack
+import eu.schicht8.meavox.core.library.SquareCovers
 import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.library.TrackRepository
 import eu.schicht8.meavox.core.library.TrackStorage
@@ -34,6 +36,7 @@ import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.session.SettingsRepository
 import eu.schicht8.meavox.core.session.TakeRepository
 import eu.schicht8.meavox.covers.AndroidCoverArtLoader
+import eu.schicht8.meavox.covers.CoverWorker
 import eu.schicht8.meavox.data.AppTrackFiles
 import eu.schicht8.meavox.data.MeaVoxDatabase
 import eu.schicht8.meavox.data.RoomLyricsRepository
@@ -88,6 +91,14 @@ class AppContainer(private val context: Context) {
     // Cover Art (#42): the Source's picture, or the one an imported file embeds.
     private val coverArtLoader by lazy { AndroidCoverArtLoader() }
     val importLocalFile: ImportLocalFile by lazy { ImportLocalFile(trackRepository, trackFiles, coverArtLoader) }
+    /** Crops the covers stored before #50 to squares, once. */
+    val squareCovers: SquareCovers by lazy { SquareCovers(trackRepository, trackFiles, coverArtLoader, settingsRepository) }
+    /** Fetches the covers network Tracks are missing (#50); run by [eu.schicht8.meavox.covers.CoverWorker]. */
+    val fetchMissingCovers: FetchMissingCovers by lazy { FetchMissingCovers(trackRepository, trackFiles, sources, coverArtLoader) }
+    /** Queues [fetchMissingCovers] for when there is a network; MeaVox, without network Sources, has nothing to fetch. */
+    fun queueMissingCovers() {
+        if (sources.isNotEmpty()) CoverWorker.queue(workManager)
+    }
     val sessions: Sessions by lazy {
         Sessions(trackRepository, takeRepository, trackFiles, audioEngine, settingsRepository, mixes)
     }

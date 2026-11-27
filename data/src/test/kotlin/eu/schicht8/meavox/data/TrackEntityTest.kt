@@ -120,4 +120,13 @@ class TrackEntityTest {
             assertEquals(track, track.toEntity(addedAt = 1).toTrack(), "$url")
         }
     }
+
+    @Test
+    fun `whether the Track's missing cover was looked up is stored and read back`() {
+        for (checked in listOf(true, false)) {
+            val track = track(TrackPipelineState.Ready(model)).copy(coverLookedUp = checked)
+
+            assertEquals(track, track.toEntity(addedAt = 1).toTrack(), "$checked")
+        }
+    }
 }

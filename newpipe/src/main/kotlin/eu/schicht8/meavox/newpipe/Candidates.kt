@@ -35,8 +35,11 @@ internal object Candidates {
         artist = uploader?.ifBlank { null },
         durationMs = durationSeconds.takeIf { it > 0 }?.times(1000),
         thumbnailUrl = thumbnail(thumbnails),
-        coverUrl = thumbnails.maxByOrNull { it.height }?.url,
+        coverUrl = coverUrl(thumbnails),
     )
+
+    /** The largest picture there is, which becomes a Track's Cover Art (#42, #50). */
+    fun coverUrl(images: List<Image>): String? = images.maxByOrNull { it.height }?.url
 
     /** The smallest thumbnail that is big enough, else the biggest there is. */
     private fun thumbnail(images: List<Image>): String? {

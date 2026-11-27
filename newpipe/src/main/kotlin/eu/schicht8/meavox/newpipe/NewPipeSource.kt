@@ -52,6 +52,10 @@ class NewPipeSource internal constructor(
         ResolvedMedia(audioUri = choice.stream.content, audioKey = choice.key, videoUri = null)
     }
 
+    override suspend fun coverUrl(sourceTrackId: String): String? = extracting {
+        Candidates.coverUrl(StreamInfo.getInfo(service, service.streamLHFactory.getUrl(sourceTrackId)).thumbnails)
+    }
+
     /** Runs extractor code off the main thread and turns its failures into [MediaUnavailable]. */
     private suspend fun <T> extracting(block: () -> T): T = try {
         runInterruptible(Dispatchers.IO) { block() }
