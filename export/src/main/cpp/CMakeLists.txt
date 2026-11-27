@@ -2,20 +2,12 @@
 cmake_minimum_required(VERSION 3.24)
 project(meavox_export LANGUAGES C)
 
-include(FetchContent)
-
-# LAME (LGPL-2.0-or-later): the MP3 encoder (ADR 8). Built as its own shared library, which the JNI library links
-# dynamically, so it can be replaced as the LGPL requires. Only the encoder library is built (no frontend, no
-# mpglib decoder); the release tarball has no CMake build, so its sources are listed here.
-FetchContent_Declare(
-        lame
-        URL https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
-        URL_HASH SHA256=ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-        # No CMakeLists.txt there: populate only.
-        SOURCE_SUBDIR no-cmake-build
-)
-FetchContent_MakeAvailable(lame)
+# LAME 3.100 (LGPL-2.0-or-later): the MP3 encoder (ADR 8). Built as its own shared library, which the JNI library
+# links dynamically, so it can be replaced as the LGPL requires. Only the encoder library is built (no frontend, no
+# mpglib decoder). Its sources are vendored unmodified from the release tarball in third_party/ (see
+# third_party/lame-3.100.md), so the build fetches nothing (#21); the tarball has no CMake build, so they are
+# listed here.
+set(lame_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/lame-3.100)
 
 add_library(mp3lame SHARED
         ${lame_SOURCE_DIR}/libmp3lame/bitstream.c

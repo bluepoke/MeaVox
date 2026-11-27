@@ -1,0 +1,11 @@
+UVR MDX-Net Karaoke (UVR_MDXNET_KARA) and UVR MDX-Net Inst HQ 4 (UVR-MDX-NET-Inst_HQ_4)
+
+These Separation Models ("Medium" and "Best") are model weights made by the authors of
+Ultimate Vocal Remover (UVR, https://github.com/Anjok07/ultimatevocalremovergui). Their weights come
+with no license: the UVR model repository (https://github.com/TRvlvr/model_repo) has none, and the
+MIT license of the UVR application doesn't cover them. A license has been asked for
+(https://github.com/Anjok07/ultimatevocalremovergui/issues/2444).
+
+They are not part of this app. If you choose Medium or Best, the app downloads the model file
+from the UVR model repository, release "all_public_uvr_models", and checks it against a fixed
+SHA-256 checksum. Fast (Spleeter, MIT) is the default and needs neither.

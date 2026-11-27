@@ -37,6 +37,7 @@ import eu.schicht8.meavox.importing.UriLocalFile
 import eu.schicht8.meavox.separation.SeparationCatalogue
 import eu.schicht8.meavox.ui.NotificationPermissionPrompt
 import eu.schicht8.meavox.ui.library.LibraryRoute
+import eu.schicht8.meavox.ui.licenses.LicensesRoute
 import eu.schicht8.meavox.ui.lyrics.LyricsSearchRoute
 import eu.schicht8.meavox.ui.models.ImportSheet
 import eu.schicht8.meavox.ui.resolve
@@ -98,7 +99,10 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable(SETTINGS) {
-                        SettingsRoute(container.modelChoices, container.settingsRepository)
+                        SettingsRoute(container.modelChoices, container.settingsRepository, onLicenses = { nav.navigate(LICENSES) })
+                    }
+                    composable(LICENSES) {
+                        LicensesRoute(modelName = container.modelChoices::nameOf)
                     }
                     composable(STORAGE) {
                         StorageRoute(container.trackStorage, SeparationCatalogue.models.associate { it.id to it.name })
@@ -202,6 +206,7 @@ class MainActivity : ComponentActivity() {
         const val SEARCH = "search"
         const val STORAGE = "storage"
         const val SETTINGS = "settings"
+        const val LICENSES = "licenses"
         const val TRACK = "track/{source}/{id}"
         const val LYRICS = "lyrics/{source}/{id}"
 

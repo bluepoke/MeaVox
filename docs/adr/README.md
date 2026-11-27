@@ -23,3 +23,4 @@
 - [21. The UI in English and German, with the domain core free of display text](0021-ui-in-english-and-german.md)
 - [22. The previous Instrumental plays while a Track is re-separated](0022-previous-instrumental-plays-while-reseparating.md)
 - [23. Latency Correction by ear, and Monitoring](0023-latency-correction-by-ear-and-monitoring.md)
+- [24. Two apps from one code base: MeaVox on Google Play, MeaVox Max on F-Droid and GitHub Releases](0024-two-apps-meavox-and-meavox-max.md)

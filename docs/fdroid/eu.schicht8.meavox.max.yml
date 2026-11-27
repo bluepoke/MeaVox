@@ -1,0 +1,45 @@
+# Draft of MeaVox Max's recipe for fdroiddata (#21, ADR 24), to go into
+# https://gitlab.com/fdroid/fdroiddata as metadata/eu.schicht8.meavox.max.yml with the merge request of #45.
+# The name, summary, description and icon come from the repository's fastlane/metadata/android/, which
+# F-Droid reads for this app (the Play listing of MeaVox lives in app/src/local/fastlane/ instead).
+Categories:
+  - Multimedia
+License: GPL-3.0-or-later
+SourceCode: https://github.com/bluepoke/MeaVox
+IssueTracker: https://github.com/bluepoke/MeaVox/issues
+Changelog: https://github.com/bluepoke/MeaVox/releases
+
+AntiFeatures:
+  NonFreeNet:
+    en-US: Searches and downloads from YouTube and other non-free services through NewPipeExtractor.
+    de-DE: Sucht und lädt von YouTube und anderen unfreien Diensten über NewPipeExtractor.
+  # The app bundles no non-free asset, but two of the three vocal removal models it can download
+  # (Medium, Best: UVR MDX-Net Karaoke and Inst HQ 4) have weights without a license (ADR 19). Drop this
+  # anti-feature once their authors license them (UVR #2444), or keep it if reviewers ask for another one.
+  NonFreeAssets:
+    en-US: Two of its vocal removal models (Medium and Best), downloaded only if chosen, have no license.
+    de-DE: Zwei seiner Modelle für die Gesangsentfernung (Mittel und Beste), die nur bei Auswahl geladen werden, haben keine Lizenz.
+
+RepoType: git
+Repo: https://github.com/bluepoke/MeaVox.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: v0.1.0
+    subdir: app
+    # Signalsmith Stretch, Signalsmith Linear and libFLAC are submodules in third_party/; LAME is vendored.
+    submodules: true
+    gradle:
+      - network
+    ndk: r28c
+
+# Optional (#21: a plus, not a requirement): publish the APK signed with the project's key once the
+# build is reproducible. Fill in the release key's certificate SHA-256 (#45), then uncomment.
+# Binaries: https://github.com/bluepoke/MeaVox/releases/download/v%v/MeaVox-Max-%v.apk
+# AllowedAPKSigningKeys: <sha256 of the MeaVox Max release certificate>
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9.]+$
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1

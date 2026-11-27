@@ -1,6 +1,6 @@
 # 19. Three Separation Models (Fast, Medium, Best) and a pre-selected Default Separation Model
 
-- Status: Accepted (amends ADR 15; amended by ADR 22)
+- Status: Accepted (amends ADR 15; amended by ADR 22, ADR 24)
 - Date: 2026-11-18
 
 ## Context
@@ -44,3 +44,8 @@ ADR 15 also says the model picker exists, but not which model it starts on, or t
 - Karaoke's quality varies a lot by song (rated 3 on "Rolling in the Deep", 1 on "November Rain", where the voice was clearly audible). The picker text must not promise a clean Instrumental.
 - Separation jobs must be keyed by model (#28), since a Track can now be separated with any of three.
 - Medium takes about 5.4 min for a 4-minute song on the weak device, so like Best it runs as a foreground-service background job, and Android 15's 6-hour daily limit has to be checked for it too.
+
+## Note: all three models in the first release (#21, 2026-11-27)
+The interim download above was to be resolved before a public release. The project owner decided to release both apps with all
+three models while UVR #2444 is unanswered: Medium and Best stay downloaded from the UVR model repository, pinned by SHA-256, and
+the in-app licenses screen says their weights have no license. If the authors refuse, both models leave the catalogue. See ADR 24.

@@ -149,6 +149,14 @@
     <string name="settings_your_name">Your name</string>
     <string name="settings_your_name_hint">Exported Mixes name you as the singer next to the artist: “&lt;artist&gt; feat. &lt;your name&gt;”.</string>
     <string name="settings_name">Name</string>
+    <string name="settings_licenses">Third-party licenses</string>
+    <string name="settings_licenses_hint">What MeaVox contains or downloads, and under which licenses.</string>
+    <string name="licenses_title">Third-party licenses</string>
+    <string name="licenses_no_license">No license</string>
+    <string name="licenses_intro">MeaVox is free software under the GNU GPL, version 3 or later. It contains, or downloads when it is needed, the work of others listed here. Open an entry for its license.</string>
+    <string name="licenses_replaceable">Linked dynamically, so it can be replaced. Its source code, as built into the app, is available free of charge from MeaVox\'s source repository.</string>
+    <string name="licenses_model_weights">A vocal removal model: downloaded the first time it is used, not part of the app.</string>
+    <string name="licenses_unlicensed_model_weights">A vocal removal model without a license: not part of the app, downloaded from its authors\' repository only if you choose it.</string>
     <string name="notifications_title">Show the progress?</string>
     <string name="notifications_text">Removing the vocals runs in the background and takes a few minutes. Allow notifications to follow it outside the app. Without them it runs just the same, and the Library shows the progress.</string>
     <string name="notifications_allow">Allow</string>

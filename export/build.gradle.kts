@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "eu.schicht8.meavox.export"
     compileSdk = libs.versions.compileSdk.get().toInt()
+    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
         minSdk = libs.versions.minSdk.get().toInt()

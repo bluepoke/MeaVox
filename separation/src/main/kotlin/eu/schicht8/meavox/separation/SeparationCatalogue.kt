@@ -44,14 +44,14 @@ object SeparationCatalogue {
      * Fast: Deezer Spleeter 2-stems (fp32), as exported to ONNX by sherpa-onnx. Separates up to
      * 11 kHz; backing vocals stay in the Instrumental.
      *
-     * Downloaded from the sherpa-onnx release until the project hosts its own copy (ADR 15, #21);
-     * the checksum keeps the file from changing under the app.
+     * Downloaded from the project's own release asset (ADR 15, #21): the sherpa-onnx archive,
+     * unchanged, with its MIT license; the checksum keeps the file from changing under the app.
      */
     val spleeter2Stems = SeparationModel(
         id = SeparationModelId("spleeter-2stems"),
         name = "Fast",
         download = ModelDownload(
-            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/source-separation-models/sherpa-onnx-spleeter-2stems.tar.bz2",
+            url = "https://github.com/bluepoke/MeaVox/releases/download/models-1/sherpa-onnx-spleeter-2stems.tar.bz2",
             sha256 = "e26401d9c1801f43c0229731d78d32c2e80085e3aceedeb25f29d2de5fa68ca2",
             bytes = 74_682_545,
             files = listOf("vocals.onnx", "accompaniment.onnx"),

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -37,10 +38,13 @@ import eu.schicht8.meavox.separating.ModelOption
 import eu.schicht8.meavox.ui.models.ModelPicker
 import kotlinx.coroutines.launch
 
-/** Settings: the Default Separation Model (ADR 19) and the singer's name, which Mix Exports are tagged with (#15). */
+/**
+ * Settings: the Default Separation Model (ADR 19), the singer's name, which Mix Exports are tagged with
+ * (#15), and the way to the third-party licenses (#21).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsRoute(choices: ModelChoices, settings: SettingsRepository) {
+fun SettingsRoute(choices: ModelChoices, settings: SettingsRepository, onLicenses: () -> Unit) {
     var options by remember { mutableStateOf<List<ModelOption>>(emptyList()) }
     var default by remember { mutableStateOf<SeparationModelId?>(null) }
     var singer by remember { mutableStateOf<String?>(null) }
@@ -85,6 +89,15 @@ fun SettingsRoute(choices: ModelChoices, settings: SettingsRepository) {
                     placeholder = { Text(stringResource(R.string.settings_name)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Column(Modifier.fillMaxWidth().clickable(onClick = onLicenses).padding(vertical = 8.dp)) {
+                Text(stringResource(R.string.settings_licenses), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.settings_licenses_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

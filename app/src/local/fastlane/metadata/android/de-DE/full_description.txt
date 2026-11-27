@@ -1,0 +1,15 @@
+MeaVox macht aus deinen Songs Karaoke. Importiere eine Audio- oder Videodatei, oder teile sie mit der App, und sing dazu.
+
+<b>Gesangsentfernung auf deinem Gerät</b>: Die App trennt einen Song in ein Instrumental und den Gesang, direkt auf deinem Handy oder Tablet. Wähle ein schnelles, ein mittleres oder ein Modell in hoher Qualität, und welches standardmäßig verwendet wird. Die Modelle werden bei der ersten Verwendung heruntergeladen.
+
+<b>Singen und aufnehmen</b>: Wiedergabe und Aufnahme mit geringer Latenz auf einer sample-genauen Zeitachse. Nimm pro Song so viele Takes auf, wie du willst, an jeder Stelle des Songs, mit optionalem Countdown und einer Übungsschleife.
+
+<b>Dich selbst hören</b>: Das Mithören spielt deine Stimme beim Singen über kabelgebundene oder USB-Kopfhörer. Eine Leitstimme lässt sich dazumischen, damit du die Melodie findest.
+
+<b>Transponieren</b>: Ändere die Tonart um bis zu ±6 Halbtöne, ohne das Tempo zu ändern, in Echtzeit.
+
+<b>Songtexte</b>: von LRCLIB geladen und als Seiten oder als synchrone Karaoke-Zeilen angezeigt, mit einstellbarem Versatz.
+
+<b>Mischen und exportieren</b>: Mische einen Take zerstörungsfrei mit dem Instrumental, mit Pegeln, Ausrichtung, Hall, Kompressor und Hochpassfilter, und exportiere als WAV, MP3 oder M4A mit Titel, Interpret und Cover. Playbacks lassen sich auch allein exportieren, in jeder Tonart.
+
+<b>Freie Software</b>: MeaVox steht unter der GNU GPL, Version 3 oder später. Keine Werbung, kein Tracking, kein Konto.

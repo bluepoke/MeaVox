@@ -4,6 +4,63 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+/**
+ * The license texts one app carries (#21): every text in `docs/licenses/` and the app's own license
+ * (`LICENSE`, as `GPL-3.0.txt`), plus those in `docs/licenses/max/` for MeaVox Max only. They land in
+ * the app's assets under `licenses/`, where the third-party licenses screen reads them.
+ */
+abstract class LicenseTexts : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val licenses: DirectoryProperty
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val appLicense: RegularFileProperty
+
+    @get:Input
+    abstract val withMax: Property<Boolean>
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val from = licenses.get().asFile
+        val into = outputDirectory.get().asFile.resolve("licenses")
+        into.deleteRecursively()
+        from.walkTopDown().filter { it.isFile && it.extension == "txt" }.forEach { text ->
+            val path = text.relativeTo(from).invariantSeparatorsPath
+            if (withMax.get() || !path.startsWith("max/")) text.copyTo(into.resolve(path))
+        }
+        appLicense.get().asFile.copyTo(into.resolve("GPL-3.0.txt"))
+    }
+}
+
+/**
+ * The release signing of [flavor] (#21), from the environment only, never from a file in the
+ * repository: the Gradle properties `meavox.signing.<flavor>.storeFile`, `.storePassword`,
+ * `.keyAlias` and `.keyPassword`, or the variables `MEAVOX_SIGNING_<FLAVOR>_STORE_FILE`, `…_STORE_PASSWORD`,
+ * `…_KEY_ALIAS` and `…_KEY_PASSWORD`. Without all four, the release build stays unsigned.
+ */
+fun releaseSigning(flavor: String): com.android.build.api.dsl.ApkSigningConfig? {
+    fun value(name: String): String? {
+        val variable = "MEAVOX_SIGNING_${flavor.uppercase()}_" + name.replace(Regex("([A-Z])"), "_$1").uppercase()
+        return providers.gradleProperty("meavox.signing.$flavor.$name").orNull?.ifBlank { null }
+            ?: providers.environmentVariable(variable).orNull?.ifBlank { null }
+    }
+    val storeFile = value("storeFile") ?: return null
+    val storePassword = value("storePassword") ?: return null
+    val keyAlias = value("keyAlias") ?: return null
+    val keyPassword = value("keyPassword") ?: return null
+    return android.signingConfigs.create("${flavor}Release") {
+        this.storeFile = file(storeFile)
+        this.storePassword = storePassword
+        this.keyAlias = keyAlias
+        this.keyPassword = keyPassword
+    }
+}
+
 android {
     namespace = "eu.schicht8.meavox"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -19,19 +76,22 @@ android {
         }
     }
 
-    // ADR 1: the network flavor will include network Sources (NewPipe); the local flavor only
-    // ever has the Local File Source and stays Play-Store-safe. Both are GPL-3.0-or-later.
+    // Two apps from one code base (ADR 24): MeaVox, the local flavor, only ever has the Local File
+    // Source and goes to Google Play; MeaVox Max, the network flavor, adds the NewPipe Sources and goes
+    // to F-Droid and GitHub Releases. Both are GPL-3.0-or-later. The IDs can't change after the first
+    // release.
     flavorDimensions += "distribution"
     productFlavors {
-        create("network") {
-            dimension = "distribution"
-            manifestPlaceholders["appLabel"] = "MeaVox"
-        }
         create("local") {
             dimension = "distribution"
-            applicationIdSuffix = ".local"
-            versionNameSuffix = "-local"
-            manifestPlaceholders["appLabel"] = "MeaVox Local"
+            manifestPlaceholders["appLabel"] = "MeaVox"
+            signingConfig = releaseSigning("local")
+        }
+        create("network") {
+            dimension = "distribution"
+            applicationIdSuffix = ".max"
+            manifestPlaceholders["appLabel"] = "MeaVox Max"
+            signingConfig = releaseSigning("network")
         }
     }
 
@@ -39,10 +99,16 @@ android {
         release {
             isMinifyEnabled = false
         }
+        // Debug builds keep the debug key, whatever the flavor says for release.
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     buildFeatures {
         compose = true
+        // The licenses screen links LAME's source at the version's tag (#21).
+        buildConfig = true
     }
 
     // English and German (#43). The generated locale config lets Android 13+ offer the app's
@@ -70,6 +136,25 @@ android {
     packaging {
         resources.excludes += listOf("META-INF/LICENSE*", "META-INF/NOTICE*")
     }
+}
+
+androidComponents {
+    onVariants { variant ->
+        val texts = tasks.register<LicenseTexts>("${variant.name}LicenseTexts") {
+            licenses.set(rootProject.layout.projectDirectory.dir("docs/licenses"))
+            appLicense.set(rootProject.layout.projectDirectory.file("LICENSE"))
+            withMax.set(variant.flavorName == "network")
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(texts, LicenseTexts::outputDirectory)
+    }
+}
+
+// The unit tests read the license texts the variant ships, as the assets hold them.
+tasks.withType<Test>().configureEach {
+    val variant = name.removePrefix("test").removeSuffix("UnitTest").replaceFirstChar { it.lowercase() }
+    val texts = tasks.named<LicenseTexts>("${variant}LicenseTexts")
+    dependsOn(texts)
+    systemProperty("meavox.licenseTexts", texts.get().outputDirectory.get().asFile.resolve("licenses").path)
 }
 
 dependencies {

@@ -14,7 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      # The native dependencies are submodules in third_party/ (#21).
       - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
 
       - uses: actions/setup-java@v6.1.0
         with:
@@ -33,6 +36,34 @@ jobs:
       # pre-accepted on GitHub's Ubuntu runners).
       - name: Build both flavors and run unit tests
         run: ./gradlew assembleNetworkDebug assembleLocalDebug test :app:lintNetworkDebug :app:lintLocalDebug --stacktrace
+
+      # Both release builds as they ship (#21): MeaVox as an App Bundle, MeaVox Max as an APK, each
+      # signed from the environment, here with a key made for this run only. The native build fetches
+      # nothing (third_party/ and FETCHCONTENT_FULLY_DISCONNECTED), as F-Droid requires.
+      - name: Build the release apps, signed with a throwaway key
+        run: |
+          keystore="$RUNNER_TEMP/throwaway.jks"
+          keytool -genkeypair -keystore "$keystore" -storepass throwaway -keypass throwaway -alias ci \
+            -keyalg RSA -keysize 2048 -validity 1 -dname "CN=MeaVox CI throwaway"
+          for flavor in LOCAL NETWORK; do
+            echo "MEAVOX_SIGNING_${flavor}_STORE_FILE=$keystore" >> "$GITHUB_ENV"
+            echo "MEAVOX_SIGNING_${flavor}_STORE_PASSWORD=throwaway" >> "$GITHUB_ENV"
+            echo "MEAVOX_SIGNING_${flavor}_KEY_ALIAS=ci" >> "$GITHUB_ENV"
+            echo "MEAVOX_SIGNING_${flavor}_KEY_PASSWORD=throwaway" >> "$GITHUB_ENV"
+          done
+
+      - name: Build MeaVox (AAB) and MeaVox Max (APK) for release
+        run: ./gradlew bundleLocalRelease assembleNetworkRelease --stacktrace
+
+      - name: Check both are signed and named as they ship
+        run: |
+          build_tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          apk=app/build/outputs/apk/network/release/app-network-release.apk
+          "$build_tools/apksigner" verify --print-certs "$apk" | grep -q "CN=MeaVox CI throwaway"
+          "$build_tools/aapt2" dump badging "$apk" | grep -q "package: name='eu.schicht8.meavox.max'"
+          "$build_tools/aapt2" dump badging "$apk" | grep -q "application-label:'MeaVox Max'"
+          aab=app/build/outputs/bundle/localRelease/app-local-release.aab
+          jarsigner -verify -verbose -certs "$aab" | grep -q "CN=MeaVox CI throwaway"
 
       - name: Upload test reports on failure
         if: failure()

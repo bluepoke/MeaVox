@@ -139,6 +139,14 @@
     <string name="settings_your_name">Dein Name</string>
     <string name="settings_your_name_hint">Exportierte Mixe nennen dich als Sänger neben dem Interpreten: „&lt;Interpret&gt; feat. &lt;dein Name&gt;“.</string>
     <string name="settings_name">Name</string>
+    <string name="settings_licenses">Lizenzen von Drittanbietern</string>
+    <string name="settings_licenses_hint">Was MeaVox enthält oder herunterlädt, und unter welchen Lizenzen.</string>
+    <string name="licenses_title">Lizenzen von Drittanbietern</string>
+    <string name="licenses_no_license">Keine Lizenz</string>
+    <string name="licenses_intro">MeaVox ist freie Software unter der GNU GPL, Version 3 oder später. Die App enthält die hier aufgeführten Werke anderer oder lädt sie herunter, wenn sie gebraucht werden. Öffne einen Eintrag für seine Lizenz.</string>
+    <string name="licenses_replaceable">Dynamisch gelinkt, damit es sich ersetzen lässt. Sein Quellcode, so wie er in die App gebaut ist, steht kostenlos im Quellcode-Repository von MeaVox bereit.</string>
+    <string name="licenses_model_weights">Ein Modell für die Gesangsentfernung: wird bei der ersten Verwendung heruntergeladen, ist nicht Teil der App.</string>
+    <string name="licenses_unlicensed_model_weights">Ein Modell für die Gesangsentfernung ohne Lizenz: nicht Teil der App, wird nur aus dem Repository seiner Autoren geladen, wenn du es wählst.</string>
     <string name="notifications_title">Fortschritt anzeigen?</string>
     <string name="notifications_text">Die Gesangsentfernung läuft im Hintergrund und dauert ein paar Minuten. Erlaube Benachrichtigungen, um sie außerhalb der App zu verfolgen. Ohne sie läuft sie genauso, und die Bibliothek zeigt den Fortschritt.</string>
     <string name="notifications_allow">Erlauben</string>

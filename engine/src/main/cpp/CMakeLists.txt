@@ -5,18 +5,23 @@ project(meavox_engine LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(FetchContent)
+# The native dependencies are Git submodules in third_party/ (#21): the build fetches nothing, as
+# F-Droid requires. A missing one means `git submodule update --init` wasn't run.
+set(THIRD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party)
+foreach(dependency signalsmith-linear signalsmith-stretch flac)
+    if(NOT EXISTS ${THIRD_PARTY}/${dependency}/CMakeLists.txt)
+        message(FATAL_ERROR "third_party/${dependency} is empty: run `git submodule update --init`")
+    endif()
+endforeach()
+# Anything that would still try to download fails instead.
+set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "" FORCE)
 
-# Signalsmith Stretch: real-time Transpose (ADR 5).
-FetchContent_Declare(
-        signalsmith-stretch
-        GIT_REPOSITORY https://github.com/Signalsmith-Audio/signalsmith-stretch.git
-        GIT_TAG 1.4.0
-        GIT_SHALLOW ON
-)
-FetchContent_MakeAvailable(signalsmith-stretch)
+# Signalsmith Stretch 1.4.0 (MIT): real-time Transpose (ADR 5). Its Signalsmith Linear 0.6.4 (MIT)
+# comes first, so Stretch uses it instead of fetching its own.
+add_subdirectory(${THIRD_PARTY}/signalsmith-linear ${CMAKE_CURRENT_BINARY_DIR}/signalsmith-linear)
+add_subdirectory(${THIRD_PARTY}/signalsmith-stretch ${CMAKE_CURRENT_BINARY_DIR}/signalsmith-stretch)
 
-# libFLAC (BSD-3-Clause): Takes (mono) and stems (stereo) are stored as FLAC (ADR 8). Only the C encoder/decoder
+# libFLAC 1.4.3 (BSD-3-Clause): Takes (mono) and stems (stereo) are stored as FLAC (ADR 8). Only the C encoder/decoder
 # library is built, statically, without Ogg, programs, docs or tests.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(BUILD_CXXLIBS OFF CACHE BOOL "" FORCE)
@@ -31,13 +36,7 @@ set(INSTALL_CMAKE_CONFIG_MODULE OFF CACHE BOOL "" FORCE)
 set(WITH_OGG OFF CACHE BOOL "" FORCE)
 set(WITH_FORTIFY_SOURCE OFF CACHE BOOL "" FORCE)
 set(WITH_STACK_PROTECTOR OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-        flac
-        GIT_REPOSITORY https://github.com/xiph/flac.git
-        GIT_TAG 1.4.3
-        GIT_SHALLOW ON
-)
-FetchContent_MakeAvailable(flac)
+add_subdirectory(${THIRD_PARTY}/flac ${CMAKE_CURRENT_BINARY_DIR}/flac EXCLUDE_FROM_ALL)
 
 # Oboe via prefab: low-latency full-duplex audio (ADR 4).
 find_package(oboe REQUIRED CONFIG)

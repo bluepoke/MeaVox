@@ -1,6 +1,6 @@
 # 8. Storage formats and Export (WAV, MP3 via LAME, M4A/AAC via MediaCodec)
 
-- Status: Accepted, amended by [ADR 18](0018-video-streaming-only-backlog.md) (no offline video; video is streaming only)
+- Status: Accepted, amended by [ADR 18](0018-video-streaming-only-backlog.md) (no offline video; video is streaming only) and [ADR 24](0024-two-apps-meavox-and-meavox-max.md) (LAME vendored)
 - Date: 2026-11-14
 - Note: the export folder follows the app name and changed with the rename to MeaVox ([#40](https://github.com/bluepoke/MeaVox/issues/40)); exports made before stay in the old folder.
 
@@ -44,3 +44,9 @@ The Session timeline runs at the **loaded Backing Audio's sample rate**, not the
 - Every picture is decoded and stored as a **JPEG** of at most 1000 px on its longer side: MP4's `covr` only takes JPEG or PNG, and Sources also serve WebP.
 - The picture is best-effort: one that can't be downloaded or read leaves the Track without Cover Art, never Failed, and isn't retried. Tracks added before #42 have none; their Exports stay without one.
 - MP3 Exports carry it as an ID3v2.4 `APIC` frame (front cover, `image/jpeg`), M4A Exports as a `covr` item (JPEG data). WAV Exports carry none.
+
+## Note: LAME vendored (#21, 2026-11-27)
+LAME 3.100 is no longer downloaded at build time: the parts of the release tarball the build uses are vendored unmodified in
+`third_party/lame-3.100/` (provenance and how to check them in `third_party/lame-3.100.md`), so the build fetches nothing, as
+F-Droid requires (ADR 24). It is still built as its own `libmp3lame.so` and linked dynamically; the vendored source is the
+LGPL source offer the app and the README point to.

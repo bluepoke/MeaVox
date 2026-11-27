@@ -1,6 +1,6 @@
 # 15. Separation Model catalogue after the separation spike
 
-- Status: Accepted (amends ADR 3), amended by [ADR 19](0019-three-separation-models-and-default-model.md) (UVR MDX-Net Karaoke as Medium, pre-selected Default Separation Model)
+- Status: Accepted (amends ADR 3), amended by [ADR 19](0019-three-separation-models-and-default-model.md) (UVR MDX-Net Karaoke as Medium, pre-selected Default Separation Model) and [ADR 24](0024-two-apps-meavox-and-meavox-max.md) (all three models in the first release, Fast hosted by the project)
 - Date: 2026-11-17
 
 ## Context
@@ -51,3 +51,8 @@ The separation spike (#3, findings in `docs/spikes/separation-spike.md`) ran ADR
 - MIT allows redistribution, also by a GPL-3.0-or-later app (ADR 11), as long as the copyright notice and the license text go with it. The text is in [`docs/licenses/MIT-Spleeter.txt`](../licenses/MIT-Spleeter.txt). The project's release asset for the Fast model and the in-app license list (#21) carry it.
 - The app uses sherpa-onnx's ONNX export of these weights (#7). The export converts the format and keeps the weights, so the MIT terms still apply.
 - So the Fast model can be hosted as a project release asset (#21). Medium and Best are still waiting on the UVR authors (UVR #2444, ADR 19).
+
+## Note: Fast hosted by the project (#21, 2026-11-27)
+The Fast model's archive is now downloaded from the project's own release asset, [`models-1`](https://github.com/bluepoke/MeaVox/releases/tag/models-1),
+unchanged from the sherpa-onnx release and with the same SHA-256, next to its MIT license. Medium and Best are still downloaded
+from the UVR model repository (ADR 19, ADR 24).
