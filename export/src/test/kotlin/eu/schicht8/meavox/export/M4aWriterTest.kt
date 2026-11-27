@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.export
 
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.port.ExportTags
 import java.io.File
 import java.io.RandomAccessFile
@@ -114,6 +115,25 @@ class M4aWriterTest {
     }
 
     @Test
+    fun `the cover is a covr item holding the JPEG`() {
+        val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3, 0xFF.toByte(), 0xD9.toByte())
+        val ilst = write(ExportTags("Song", "Artist", CoverArt(jpeg))).path("moov", "udta", "meta", "ilst")
+
+        val data = ilst.path("covr", "data").body.duplicate()
+        assertEquals(13, data.int, "JPEG data")
+        assertEquals(0, data.int, "locale")
+        assertContentEquals(jpeg, ByteArray(data.remaining()).also(data::get))
+        assertEquals("Song", ilst.child("©nam").text(), "the text items stay")
+    }
+
+    @Test
+    fun `without a cover there is no covr item`() {
+        val ilst = write(ExportTags("Song", "Artist")).path("moov", "udta", "meta", "ilst")
+
+        assertNull(ilst.children().find { it.type == "covr" })
+    }
+
+    @Test
     fun `an Export with no frames is an empty but well-formed file`() {
         RandomAccessFile(file, "rw").use { raf -> M4aWriter(raf.channel, 44_100, 2, ExportTags("Silence")).finish(config) }
         val root = Box("file", ByteBuffer.wrap(file.readBytes()), 0)
@@ -158,7 +178,7 @@ class M4aWriterTest {
         /** Bytes of fields before the children of the boxes that have both; boxes not listed hold either. */
         val CHILDREN_AFTER = mapOf(
             "file" to 0, "moov" to 0, "trak" to 0, "mdia" to 0, "minf" to 0, "stbl" to 0, "udta" to 0, "ilst" to 0,
-            "meta" to 4, "stsd" to 8, "mp4a" to 28, "©nam" to 0, "©ART" to 0,
+            "meta" to 4, "stsd" to 8, "mp4a" to 28, "©nam" to 0, "©ART" to 0, "covr" to 0,
         )
     }
 }

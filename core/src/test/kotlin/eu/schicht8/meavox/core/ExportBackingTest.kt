@@ -6,6 +6,7 @@ import eu.schicht8.meavox.core.export.BackingExportUnavailable
 import eu.schicht8.meavox.core.export.ExportBacking
 import eu.schicht8.meavox.core.library.RenameTrack
 import eu.schicht8.meavox.core.model.BackingChoice
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.model.FailureKind
 import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
@@ -108,6 +109,17 @@ class ExportBackingTest {
         assertEquals(emptyList(), exportBacking.options(trackId).layers)
         val failure = assertFailsWith<BackingExportUnavailable> { exportBacking.export(trackId, BackingChoice.OriginalAudio, Transpose.None, ExportFormat.Wav()) }
         assertEquals(BackingExportUnavailable.Why.NotDownloaded, failure.why)
+    }
+
+    @Test
+    fun `a Backing Export carries the Track's Cover Art`() = runTest {
+        addTrack(TrackPipelineState.Ready(FAST))
+        val cover = CoverArt(byteArrayOf(4, 5, 6))
+        files.storeCover(trackId, cover)
+
+        exportBacking.export(trackId, BackingChoice.OriginalAudio, Transpose.None, ExportFormat.Mp3())
+
+        assertEquals(cover, store.exports.single().tags.cover)
     }
 
     @Test

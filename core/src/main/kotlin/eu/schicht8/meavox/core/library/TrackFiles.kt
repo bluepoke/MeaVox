@@ -3,6 +3,7 @@ package eu.schicht8.meavox.core.library
 
 import eu.schicht8.meavox.core.model.AppDirectory
 import eu.schicht8.meavox.core.model.AudioFile
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.TakeId
 import eu.schicht8.meavox.core.model.TrackId
@@ -19,6 +20,12 @@ interface TrackFiles {
 
     /** Where a running Separation of [track] with [model] keeps its work so far (ADR 15). */
     fun separationCheckpoint(track: TrackId, model: SeparationModelId): AppDirectory
+
+    /** Stores [cover] as the Track's Cover Art (#42), replacing any it had. Deleted with the Track. */
+    suspend fun storeCover(track: TrackId, cover: CoverArt)
+
+    /** The Track's Cover Art, or null if it has none. */
+    suspend fun cover(track: TrackId): CoverArt?
 
     /** Location for a kept Take's audio (mono FLAC, ADR 8). */
     fun take(track: TrackId, take: TakeId): AudioFile

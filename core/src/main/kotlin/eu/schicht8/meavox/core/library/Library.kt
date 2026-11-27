@@ -37,6 +37,7 @@ class Library(private val tracks: TrackRepository, private val takes: TakeReposi
             pipeline = TrackPipelineState.Added,
             vocalFree = vocalFree,
             separationModel = separationModel,
+            coverUrl = candidate.coverUrl,
         )
         return tracks.addIfAbsent(track)
     }

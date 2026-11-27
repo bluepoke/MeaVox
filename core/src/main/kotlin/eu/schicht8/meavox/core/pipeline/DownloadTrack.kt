@@ -8,6 +8,7 @@ import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.model.TrackPipelineState
+import eu.schicht8.meavox.core.port.CoverArtLoader
 import eu.schicht8.meavox.core.port.MediaDownloader
 import eu.schicht8.meavox.core.port.MediaUnavailable
 import eu.schicht8.meavox.core.port.Source
@@ -23,13 +24,15 @@ import kotlinx.coroutines.launch
  * The Downloading step of the Track Pipeline: a Source's audio becomes the Original Audio (ADR 10).
  * Failures that may pass (no network, an expired link) are retried; after [maxFailedAttempts] of
  * them the Track ends Failed, keeping the bytes so far for a manual retry. Only failed tries count,
- * not runs cut short by process death.
+ * not runs cut short by process death. Once the Track is Downloaded, the Source's picture becomes its
+ * Cover Art (#42); without it the Track is Downloaded all the same.
  */
 class DownloadTrack(
     private val tracks: TrackRepository,
     private val files: TrackFiles,
     private val sources: List<Source>,
     private val downloader: MediaDownloader,
+    private val covers: CoverArtLoader,
     private val maxFailedAttempts: Int = 5,
 ) {
     enum class Outcome {
@@ -78,6 +81,8 @@ class DownloadTrack(
         when {
             failure == null -> {
                 tracks.updatePipeline(id, TrackPipelineState.Downloaded)
+                // After the audio is safe: a run cut short now only loses the picture.
+                downloadCover(id)
                 Outcome.Done
             }
             failure is MediaUnavailable && failure.retryable && failedAttempts < maxFailedAttempts -> {
@@ -89,6 +94,18 @@ class DownloadTrack(
                 tracks.updatePipeline(id, TrackPipelineState.Failed(PipelineStep.Downloading, checkNotNull(reason)))
                 Outcome.Done
             }
+        }
+    }
+
+    /** Stores the Source's picture as the Track's Cover Art, if it has one that can be downloaded. */
+    private suspend fun downloadCover(id: TrackId) {
+        val url = tracks.get(id)?.coverUrl ?: return
+        try {
+            files.storeCover(id, covers.download(url))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // An Export without a cover beats a Track that can't be sung.
         }
     }
 }

@@ -34,6 +34,11 @@ data class Track(
      * neither their Mixes.
      */
     val lastTranspose: Transpose = Transpose.None,
+    /**
+     * Where the Source's picture of the item is, downloaded as the Track's Cover Art with its Original
+     * Audio (#42). Null for imported files, which bring their own, and for Tracks added before.
+     */
+    val coverUrl: String? = null,
 ) {
     /**
      * The Separation Model whose Instrumental plays: the one the Track is Ready with, or while it is

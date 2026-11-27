@@ -15,7 +15,7 @@ import eu.schicht8.meavox.core.session.TakeRepository
 /**
  * Export of a Mix (GLOSSARY: Export, ADR 8): the Offline Render of its Take's span, written to
  * `Music/MeaVox/`. The render uses the same DSP as Review and the Mix Preview. It is tagged with the
- * Track's artist featuring the singer, whose name is a setting.
+ * Track's artist featuring the singer, whose name is a setting, and carries the Track's Cover Art.
  */
 class ExportMix(
     private val tracks: TrackRepository,
@@ -34,7 +34,11 @@ class ExportMix(
     suspend fun export(id: MixId, format: ExportFormat, onProgress: (Float) -> Unit = {}): ExportedFile {
         val parts = resolveMix(id, mixes, tracks, takes, files)
         val render = parts.render(files)
-        val tags = ExportTags("${parts.track.title} (${parts.mix.name})", mixArtist(parts.track.artist, settings.singerName()))
+        val tags = ExportTags(
+            "${parts.track.title} (${parts.mix.name})",
+            mixArtist(parts.track.artist, settings.singerName()),
+            files.cover(parts.track.id),
+        )
         return store.export(tags, format, render.sampleRate, render.frames, onProgress = onProgress) { sink ->
             renderer.render(render, sink)
         }

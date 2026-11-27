@@ -5,6 +5,7 @@ import eu.schicht8.meavox.core.library.StagedFile
 import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.model.AppDirectory
 import eu.schicht8.meavox.core.model.AudioFile
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.TakeId
 import eu.schicht8.meavox.core.model.TrackId
@@ -62,6 +63,14 @@ class InMemoryTrackFiles : TrackFiles {
     override fun separationCheckpoint(track: TrackId, model: SeparationModelId) =
         AppDirectory("/mem/${track.key}/${model.value}/checkpoint")
 
+    private val covers = mutableMapOf<TrackId, CoverArt>()
+
+    override suspend fun storeCover(track: TrackId, cover: CoverArt) {
+        covers[track] = cover
+    }
+
+    override suspend fun cover(track: TrackId): CoverArt? = covers[track]
+
     override fun take(track: TrackId, take: TakeId) = AudioFile("/mem/${track.key}/takes/${take.value}")
 
     /** Take files removed through [deleteTake]. */
@@ -114,11 +123,13 @@ class InMemoryTrackFiles : TrackFiles {
 
     override suspend fun deleteAllExcept(keep: Set<TrackId>) {
         val kept = keep.map { "/mem/${it.key}/" }
+        covers.keys.retainAll(keep)
         sizes.keys.removeAll { path -> path.startsWith("/mem/") && !path.startsWith("/mem/staging/") && kept.none(path::startsWith) }
     }
 
     override suspend fun deleteAll(track: TrackId) {
         originals.remove(track)
+        covers.remove(track)
         sizes.keys.removeAll { it.startsWith("/mem/${track.key}/") }
         deleted += track
     }

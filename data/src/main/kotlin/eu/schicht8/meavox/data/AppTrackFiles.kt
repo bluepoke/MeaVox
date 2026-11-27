@@ -5,6 +5,7 @@ import eu.schicht8.meavox.core.library.StagedFile
 import eu.schicht8.meavox.core.library.TrackFiles
 import eu.schicht8.meavox.core.model.AppDirectory
 import eu.schicht8.meavox.core.model.AudioFile
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.TakeId
 import eu.schicht8.meavox.core.model.TrackId
@@ -36,6 +37,25 @@ class AppTrackFiles(private val root: File) : TrackFiles {
 
     override fun separationCheckpoint(track: TrackId, model: SeparationModelId): AppDirectory =
         AppDirectory(File(dirOf(track), "stems/${hash(model.value)}.checkpoint").path)
+
+    // In the Track's directory, so it goes with the Track.
+    private fun coverOf(track: TrackId): File = File(dirOf(track), "cover.jpg")
+
+    override suspend fun storeCover(track: TrackId, cover: CoverArt) = withContext(Dispatchers.IO) {
+        val target = coverOf(track)
+        target.parentFile?.mkdirs()
+        // Written beside it first, so a cover is never read half-written.
+        val part = File(target.path + ".part")
+        part.writeBytes(cover.jpeg)
+        if (!part.renameTo(target)) {
+            part.delete()
+            throw IOException("could not move $part to $target")
+        }
+    }
+
+    override suspend fun cover(track: TrackId): CoverArt? = withContext(Dispatchers.IO) {
+        coverOf(track).takeIf { it.isFile }?.let { CoverArt(it.readBytes()) }
+    }
 
     override fun take(track: TrackId, take: TakeId): AudioFile =
         AudioFile(File(dirOf(track), "takes/${hash(take.value)}.flac").path)

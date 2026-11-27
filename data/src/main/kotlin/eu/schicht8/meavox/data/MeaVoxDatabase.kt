@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [TrackEntity::class, TakeEntity::class, SettingEntity::class, LyricsEntity::class, LyricsOffsetEntity::class, MixEntity::class],
-    version = 17,
+    version = 18,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2), // 2: takes and settings tables (#8)
@@ -28,6 +28,7 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 14, to = 15), // 15: each Mix's Vocal Effects and Guide Vocal level (#16)
         AutoMigration(from = 15, to = 16), // 16: the model whose Instrumental plays while a Track is re-separated (#37)
         AutoMigration(from = 16, to = 17), // 17: the Latency Correction each Take was kept with (#9)
+        AutoMigration(from = 17, to = 18), // 18: where each Track's Cover Art is downloaded from (#42)
     ],
 )
 abstract class MeaVoxDatabase : RoomDatabase() {

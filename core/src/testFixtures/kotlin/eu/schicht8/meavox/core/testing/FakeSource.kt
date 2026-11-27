@@ -19,8 +19,14 @@ class FakeSource(override val id: SourceId) : Source {
     /** Thrown by [resolve] while set. */
     var resolveFailure: Exception? = null
 
-    fun add(sourceTrackId: String, title: String, artist: String? = null, durationMs: Long? = null): SourceCandidate =
-        SourceCandidate(TrackId(id, sourceTrackId), title, artist, durationMs).also { catalogue += it }
+    fun add(
+        sourceTrackId: String,
+        title: String,
+        artist: String? = null,
+        durationMs: Long? = null,
+        coverUrl: String? = null,
+    ): SourceCandidate =
+        SourceCandidate(TrackId(id, sourceTrackId), title, artist, durationMs, coverUrl = coverUrl).also { catalogue += it }
 
     override suspend fun search(query: String): List<SourceCandidate> =
         catalogue.filter { c ->

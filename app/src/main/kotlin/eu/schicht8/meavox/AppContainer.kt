@@ -33,6 +33,7 @@ import eu.schicht8.meavox.core.port.Source
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.session.SettingsRepository
 import eu.schicht8.meavox.core.session.TakeRepository
+import eu.schicht8.meavox.covers.AndroidCoverArtLoader
 import eu.schicht8.meavox.data.AppTrackFiles
 import eu.schicht8.meavox.data.MeaVoxDatabase
 import eu.schicht8.meavox.data.RoomLyricsRepository
@@ -84,7 +85,9 @@ class AppContainer(private val context: Context) {
     val trackStorage: TrackStorage by lazy {
         TrackStorage(trackRepository, takeRepository, mixRepository, trackFiles, pipelineJobs, SeparationCatalogue.models.map { it.id })
     }
-    val importLocalFile: ImportLocalFile by lazy { ImportLocalFile(trackRepository, trackFiles) }
+    // Cover Art (#42): the Source's picture, or the one an imported file embeds.
+    private val coverArtLoader by lazy { AndroidCoverArtLoader() }
+    val importLocalFile: ImportLocalFile by lazy { ImportLocalFile(trackRepository, trackFiles, coverArtLoader) }
     val sessions: Sessions by lazy {
         Sessions(trackRepository, takeRepository, trackFiles, audioEngine, settingsRepository, mixes)
     }
@@ -134,7 +137,7 @@ class AppContainer(private val context: Context) {
 
     // Network Sources (ADR 1): none in the local flavor.
     val sources: List<Source> by lazy { FlavorSources.create() }
-    val downloadTrack: DownloadTrack by lazy { DownloadTrack(trackRepository, trackFiles, sources, HttpMediaDownloader()) }
+    val downloadTrack: DownloadTrack by lazy { DownloadTrack(trackRepository, trackFiles, sources, HttpMediaDownloader(), coverArtLoader) }
     val linkImporter: LinkImporter by lazy { LinkImporter(appScope, LookUpSharedLink(sources), trackRepository, library) }
 
     /** A picked or shared song waiting for the import sheet (ADR 19); null when none is. */

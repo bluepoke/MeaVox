@@ -8,6 +8,7 @@ import eu.schicht8.meavox.core.mix.MixId
 import eu.schicht8.meavox.core.mix.MixSettings
 import eu.schicht8.meavox.core.mix.MixUnavailable
 import eu.schicht8.meavox.core.mix.VocalEffects
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.model.OutputRoute
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
@@ -113,6 +114,17 @@ class ExportMixTest {
 
         assertEquals(ExportTags("Fly Me to the Moon (Mix 1)", artist = "Frank Sinatra feat. Peter"), store.exports.single().tags)
         assertEquals(ExportFormat.Mp3(ExportFormat.Mp3.Bitrate.VbrV2), store.exports.single().format)
+    }
+
+    @Test
+    fun `a Mix Export carries the Track's Cover Art`() = runTest {
+        val mix = arrange(TrackPipelineState.Ready(FAST), BackingAudio.Instrumental(FAST))
+        val cover = CoverArt(byteArrayOf(1, 2, 3))
+        files.storeCover(trackId, cover)
+
+        export.export(mix.id, ExportFormat.M4a)
+
+        assertEquals(cover, store.exports.single().tags.cover)
     }
 
     @Test

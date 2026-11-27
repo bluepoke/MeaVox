@@ -2,6 +2,7 @@
 package eu.schicht8.meavox.core
 
 import eu.schicht8.meavox.core.library.Library
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.model.FailureKind
 import eu.schicht8.meavox.core.model.FailureReason
 import eu.schicht8.meavox.core.model.PipelineStep
@@ -9,6 +10,7 @@ import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.TrackPipelineState
 import eu.schicht8.meavox.core.pipeline.DownloadTrack
 import eu.schicht8.meavox.core.port.MediaUnavailable
+import eu.schicht8.meavox.core.testing.FakeCoverArtLoader
 import eu.schicht8.meavox.core.testing.FakeMediaDownloader
 import eu.schicht8.meavox.core.testing.FakeSource
 import eu.schicht8.meavox.core.testing.InMemoryTrackFiles
@@ -20,13 +22,15 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class DownloadTrackTest {
     private val tracks = InMemoryTrackRepository()
     private val files = InMemoryTrackFiles()
     private val youtube = FakeSource(SourceId("youtube"))
     private val downloader = FakeMediaDownloader(files)
-    private val download = DownloadTrack(tracks, files, listOf(youtube), downloader)
+    private val covers = FakeCoverArtLoader()
+    private val download = DownloadTrack(tracks, files, listOf(youtube), downloader, covers)
     private val library = Library(tracks, InMemoryTakeRepository())
 
     @Test
@@ -40,6 +44,66 @@ class DownloadTrackTest {
         assertEquals(DownloadTrack.Outcome.Done, outcome)
         assertEquals(TrackPipelineState.Downloaded, tracks.get(track.id)?.pipeline)
         assertEquals("the audio of Beat It", files.originalAudioContent(track.id)?.decodeToString())
+    }
+
+    @Test
+    fun `the Source's picture is downloaded with the audio and kept as the Track's Cover Art`() = runTest {
+        val track = library.add(youtube.add("beat-it", "Beat It", coverUrl = "https://img.example/beat-it.webp"))
+        downloader.serve(youtube.audioUriOf("beat-it"), "the audio of Beat It")
+        val cover = CoverArt(byteArrayOf(1, 2, 3))
+        covers.serve("https://img.example/beat-it.webp", cover)
+
+        download(track.id)
+
+        assertEquals(cover, files.cover(track.id))
+    }
+
+    @Test
+    fun `the Track is Downloaded before its picture is fetched, so a slow picture never holds up the audio`() = runTest {
+        val track = library.add(youtube.add("beat-it", "Beat It", coverUrl = "https://img.example/beat-it.jpg"))
+        downloader.serve(youtube.audioUriOf("beat-it"), "the audio of Beat It")
+        covers.serve("https://img.example/beat-it.jpg", CoverArt(byteArrayOf(1)))
+        var whileFetching: TrackPipelineState? = null
+        covers.beforeDownload = { whileFetching = tracks.get(track.id)?.pipeline }
+
+        download(track.id)
+
+        assertEquals(TrackPipelineState.Downloaded, whileFetching)
+    }
+
+    @Test
+    fun `a picture that can't be downloaded leaves the Track without Cover Art, but Downloaded`() = runTest {
+        val track = library.add(youtube.add("beat-it", "Beat It", coverUrl = "https://img.example/gone.jpg"))
+        downloader.serve(youtube.audioUriOf("beat-it"), "the audio of Beat It")
+
+        val outcome = download(track.id)
+
+        assertEquals(DownloadTrack.Outcome.Done, outcome)
+        assertEquals(TrackPipelineState.Downloaded, tracks.get(track.id)?.pipeline)
+        assertNull(files.cover(track.id))
+    }
+
+    @Test
+    fun `a Track without a picture is downloaded without Cover Art`() = runTest {
+        val track = library.add(youtube.add("beat-it", "Beat It"))
+        downloader.serve(youtube.audioUriOf("beat-it"), "the audio of Beat It")
+
+        download(track.id)
+
+        assertEquals(TrackPipelineState.Downloaded, tracks.get(track.id)?.pipeline)
+        assertEquals(emptyList(), covers.downloaded)
+        assertNull(files.cover(track.id))
+    }
+
+    @Test
+    fun `a download that fails doesn't fetch the picture yet`() = runTest {
+        val track = library.add(youtube.add("beat-it", "Beat It", coverUrl = "https://img.example/beat-it.jpg"))
+        downloader.serve(youtube.audioUriOf("beat-it"), "0123456789")
+        downloader.failAfterBytes = 4
+
+        download(track.id)
+
+        assertEquals(emptyList(), covers.downloaded)
     }
 
     @Test

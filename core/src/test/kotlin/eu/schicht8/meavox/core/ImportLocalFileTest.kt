@@ -4,11 +4,13 @@ package eu.schicht8.meavox.core
 import eu.schicht8.meavox.core.library.ImportLocalFile
 import eu.schicht8.meavox.core.library.Library
 import eu.schicht8.meavox.core.library.RenameTrack
+import eu.schicht8.meavox.core.model.CoverArt
 import eu.schicht8.meavox.core.model.SeparationModelId
 import eu.schicht8.meavox.core.model.SourceId
 import eu.schicht8.meavox.core.model.Track
 import eu.schicht8.meavox.core.model.TrackId
 import eu.schicht8.meavox.core.model.TrackPipelineState
+import eu.schicht8.meavox.core.testing.FakeCoverArtLoader
 import eu.schicht8.meavox.core.testing.FakeLocalFile
 import eu.schicht8.meavox.core.testing.InMemoryLyricsRepository
 import eu.schicht8.meavox.core.testing.InMemoryTrackFiles
@@ -19,12 +21,35 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 
 class ImportLocalFileTest {
     private val tracks = InMemoryTrackRepository()
     private val files = InMemoryTrackFiles()
-    private val import = ImportLocalFile(tracks, files)
+    private val covers = FakeCoverArtLoader()
+    private val import = ImportLocalFile(tracks, files, covers)
     private val library = Library(tracks, InMemoryTakeRepository())
+
+    @Test
+    fun `the picture an imported file embeds becomes the Track's Cover Art`() = runTest {
+        val file = FakeLocalFile(displayName = "My Way.mp3", content = "audio-1")
+        val id = TrackId(SourceId.Local, sha256("audio-1"))
+        val cover = CoverArt(byteArrayOf(9, 8, 7))
+        covers.embed(files.originalAudio(id), cover)
+
+        val track = import(file)
+
+        assertEquals(id, track.id)
+        assertEquals(cover, files.cover(track.id))
+    }
+
+    @Test
+    fun `a file without a picture is imported without Cover Art`() = runTest {
+        val track = import(FakeLocalFile(displayName = "My Way.mp3", content = "audio-1"))
+
+        assertEquals(TrackPipelineState.Downloaded, track.pipeline)
+        assertNull(files.cover(track.id))
+    }
 
     @Test
     fun `importing a file adds a Downloaded Track from the Local File Source named after the file`() = runTest {

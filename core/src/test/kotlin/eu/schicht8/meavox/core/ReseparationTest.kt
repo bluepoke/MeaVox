@@ -20,6 +20,7 @@ import eu.schicht8.meavox.core.session.BackingAudio
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.session.backingAudio
 import eu.schicht8.meavox.core.testing.FakeAudioEngine
+import eu.schicht8.meavox.core.testing.FakeCoverArtLoader
 import eu.schicht8.meavox.core.testing.FakeLocalFile
 import eu.schicht8.meavox.core.testing.FakeLoudnessMeter
 import eu.schicht8.meavox.core.testing.FakePipelineJobs
@@ -169,7 +170,7 @@ class ReseparationTest {
 
     @Test
     fun `a first Separation, or stems that were deleted, leave nothing to play meanwhile`() = runTest {
-        val first = ImportLocalFile(tracks, files)(FakeLocalFile(displayName = "a.mp3", content = "audio-a"))
+        val first = ImportLocalFile(tracks, files, FakeCoverArtLoader())(FakeLocalFile(displayName = "a.mp3", content = "audio-a"))
         tracks.updatePipeline(first.id, TrackPipelineState.Separating(FAST, SeparationProgress(SeparationProgress.Stage.Separating, 0.5f)))
         val deleted = readyWithFast("b.mp3")
         tracks.updatePipeline(deleted.id, TrackPipelineState.StemsDeleted(FAST))
@@ -217,7 +218,7 @@ class ReseparationTest {
     }
 
     private suspend fun readyWithFast(name: String = "song.mp3"): Track {
-        val track = ImportLocalFile(tracks, files)(FakeLocalFile(displayName = name, content = "audio-$name"))
+        val track = ImportLocalFile(tracks, files, FakeCoverArtLoader())(FakeLocalFile(displayName = name, content = "audio-$name"))
         return tracks.updatePipeline(track.id, TrackPipelineState.Ready(FAST))
     }
 

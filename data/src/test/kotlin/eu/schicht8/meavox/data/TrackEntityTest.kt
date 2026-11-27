@@ -111,4 +111,13 @@ class TrackEntityTest {
             assertEquals(track, track.toEntity(addedAt = 1).toTrack(), "$semitones")
         }
     }
+
+    @Test
+    fun `where the Cover Art comes from is stored and read back, and may be unset`() {
+        for (url in listOf("https://i.ytimg.com/vi/abc/maxresdefault.jpg", null)) {
+            val track = track(TrackPipelineState.Added).copy(coverUrl = url)
+
+            assertEquals(track, track.toEntity(addedAt = 1).toTrack(), "$url")
+        }
+    }
 }

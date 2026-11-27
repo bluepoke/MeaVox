@@ -12,6 +12,7 @@ import eu.schicht8.meavox.core.pipeline.TrackPipeline
 import eu.schicht8.meavox.core.pipeline.VocalFreeToggle
 import eu.schicht8.meavox.core.port.SeparationFailed
 import eu.schicht8.meavox.core.port.SeparationProgress
+import eu.schicht8.meavox.core.testing.FakeCoverArtLoader
 import eu.schicht8.meavox.core.testing.FakeLocalFile
 import eu.schicht8.meavox.core.testing.FakePipelineJobs
 import eu.schicht8.meavox.core.testing.FakeSeparator
@@ -32,7 +33,7 @@ class SeparateTrackTest {
     private val tracks = InMemoryTrackRepository()
     private val files = InMemoryTrackFiles()
     private val separator = FakeSeparator()
-    private val import = ImportLocalFile(tracks, files)
+    private val import = ImportLocalFile(tracks, files, FakeCoverArtLoader())
     private val separate = SeparateTrack(tracks, files, separator)
     private val fast = SeparationModelId("fast")
 

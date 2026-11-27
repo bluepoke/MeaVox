@@ -46,6 +46,15 @@ class LibraryTest {
     }
 
     @Test
+    fun `adding a search result keeps where its Cover Art is, to download it with the Track`() = runTest {
+        val candidate = source.add("v2", "My Way", coverUrl = "https://img.example/v2/large.jpg")
+
+        val track = library.add(candidate)
+
+        assertEquals("https://img.example/v2/large.jpg", tracks.get(track.id)?.coverUrl)
+    }
+
+    @Test
     fun `a new Library has no Tracks`() = runTest {
         assertEquals(emptyList(), library.tracks().first())
     }

@@ -35,6 +35,7 @@ internal object Candidates {
         artist = uploader?.ifBlank { null },
         durationMs = durationSeconds.takeIf { it > 0 }?.times(1000),
         thumbnailUrl = thumbnail(thumbnails),
+        coverUrl = thumbnails.maxByOrNull { it.height }?.url,
     )
 
     /** The smallest thumbnail that is big enough, else the biggest there is. */

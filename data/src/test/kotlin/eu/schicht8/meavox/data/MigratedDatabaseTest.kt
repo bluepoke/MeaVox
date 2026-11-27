@@ -241,6 +241,7 @@ class MigratedDatabaseTest {
                 "$what plays only the Instrumental it is Ready with, no previous one (#37)",
             )
         }
+        if (from < 18) assertNull(track.coverUrl, "$what has no picture to download, so its Exports have no Cover Art (#42)")
     }
 
     private fun trackRow(

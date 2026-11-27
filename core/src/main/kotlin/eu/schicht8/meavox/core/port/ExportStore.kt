@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package eu.schicht8.meavox.core.port
 
+import eu.schicht8.meavox.core.model.CoverArt
+
 /** Where Exports go: `Music/MeaVox/`, from where they can be shared (ADR 8). */
 interface ExportStore {
     /**
@@ -11,8 +13,8 @@ interface ExportStore {
     suspend fun create(tags: ExportTags, format: ExportFormat, sampleRate: Int, frames: Long?): ExportWriter
 }
 
-/** What an Export is tagged with, and named after. Cover art comes with #42. */
-data class ExportTags(val title: String, val artist: String? = null)
+/** What an Export is tagged with, and named after; [cover] is the Track's Cover Art, if it has one (#42). */
+data class ExportTags(val title: String, val artist: String? = null, val cover: CoverArt? = null)
 
 /** One Export being written: the rendered audio, then [commit] or [abort]. */
 interface ExportWriter : PcmSink {

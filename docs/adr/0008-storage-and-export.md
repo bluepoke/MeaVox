@@ -15,7 +15,7 @@
 
 **Export formats:**
 - **WAV**: 16-bit PCM (24-bit optional).
-- **MP3**: via **LAME** (LGPL) through the NDK. Default VBR V2, with 320 kbps CBR optional. Tagged with **ID3** (title, artist "feat. <singer>", cover art from the thumbnail).
+- **MP3**: via **LAME** (LGPL) through the NDK. Default VBR V2, with 320 kbps CBR optional. Tagged with **ID3** (title, artist "feat. <singer>", Cover Art from the Source's picture; see the note on #42).
 - **M4A/AAC**: via the platform **MediaCodec** encoder, with MP4 metadata tags.
 - Output goes to **MediaStore** `Music/MeaVox/`, and can also be shared through the Android share sheet.
 
@@ -37,4 +37,10 @@ The Session timeline runs at the **loaded Backing Audio's sample rate**, not the
 - **LAME 3.100** is built from its release tarball as its own shared library (`libmp3lame.so`). The JNI library links it dynamically, as the LGPL requires. The source is the unmodified tarball, pinned by its SHA-256 in `export/src/main/cpp/CMakeLists.txt`. Its licence is in [`docs/licenses/LGPL-2.0-LAME.txt`](../licenses/LGPL-2.0-LAME.txt); #21 lists it in the app. LAME writes its Xing/LAME tag frame, which carries the length and the encoder delay, and the frame is written over once the stream ends. The ID3 tag is written in Kotlin as **ID3v2.4** with UTF-8 text. v2.3 was tried first, but Android collapses its UTF-16 frames that hold only Latin-1 characters to 8 bits, and its charset detector then garbled the other frames: "– Für" came back as "â€“ FĂĽr" on an Android 14 tablet.
 - **M4A** is muxed by the app, not by MediaMuxer, which can't write iTunes metadata (`©nam`, `©ART`). `moov` follows `mdat`, because only the end of the render knows the length. The encoder's priming and padding (a few AAC frames) are not trimmed with an edit list.
 - A Mix Export's artist is "<artist> feat. <singer>". The **singer's name** is a setting ("Your name"). Without it, the tag holds the artist alone, and without an artist, the name alone. Backing Exports keep the original artist.
-- **Cover art** comes with [#42](https://github.com/bluepoke/MeaVox/issues/42): a Track doesn't keep its thumbnail yet.
+- **Cover art** came later, with [#42](https://github.com/bluepoke/MeaVox/issues/42) (see its note below).
+
+## Note: Cover Art built in #42 (2026-11-27)
+- A Track added from a Source keeps where the Source's **largest** picture of the item is (`coverUrl`, Room version 18), not the small thumbnail the search list shows. The Downloading step downloads it once the Track is Downloaded (so a run cut short only loses the picture, never the audio) and stores it with the Track's files, so Exports work offline and the picture goes when the Track is deleted. An imported file's embedded picture (`MediaMetadataRetriever`) is stored the same way during the import.
+- Every picture is decoded and stored as a **JPEG** of at most 1000 px on its longer side: MP4's `covr` only takes JPEG or PNG, and Sources also serve WebP.
+- The picture is best-effort: one that can't be downloaded or read leaves the Track without Cover Art, never Failed, and isn't retried. Tracks added before #42 have none; their Exports stay without one.
+- MP3 Exports carry it as an ID3v2.4 `APIC` frame (front cover, `image/jpeg`), M4A Exports as a `covr` item (JPEG data). WAV Exports carry none.

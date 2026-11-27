@@ -40,7 +40,8 @@ class ExportBacking(
 
     /**
      * Renders [layer] of the Track whole at [transpose] and stores it in [format], tagged with the
-     * Track's artist and its title with the layer and Transpose ("Title (Instrumental, +2)").
+     * Track's artist and its title with the layer and Transpose ("Title (Instrumental, +2)"), and with
+     * its Cover Art.
      * [onProgress] receives 0..1. Cancelling removes the unfinished file. The Last Transpose stays.
      * @throws BackingExportUnavailable if the Track doesn't offer [layer] now.
      */
@@ -66,7 +67,7 @@ class ExportBacking(
         )
         val rate = renderer.sampleRate(backing)
         val estimated = track.durationMs?.let { it * rate / 1000 }
-        val tags = ExportTags(backingExportTitle(track, layer, transpose), track.artist)
+        val tags = ExportTags(backingExportTitle(track, layer, transpose), track.artist, files.cover(id))
         return store.export(tags, format, rate, frames = null, estimatedFrames = estimated, onProgress = onProgress) { sink ->
             renderer.renderBacking(backing, transpose, sink)
         }

@@ -9,10 +9,10 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
 /**
- * Writes AAC frames into an M4A file (ADR 8) with the title and artist as iTunes metadata, which
- * the platform's MediaMuxer can't write. The frames stream into `mdat` as they come; `moov`, with the
- * sample table, follows at the end, since only then are their number and sizes known. All frames
- * form one chunk. Each frame holds [SAMPLES_PER_FRAME] samples per channel (AAC-LC).
+ * Writes AAC frames into an M4A file (ADR 8) with the title, the artist and the Cover Art (#42) as
+ * iTunes metadata, which the platform's MediaMuxer can't write. The frames stream into `mdat` as they
+ * come; `moov`, with the sample table, follows at the end, since only then are their number and sizes
+ * known. All frames form one chunk. Each frame holds [SAMPLES_PER_FRAME] samples per channel (AAC-LC).
  */
 internal class M4aWriter(
     private val channel: FileChannel,
@@ -154,6 +154,7 @@ internal class M4aWriter(
                     box("ilst") {
                         item("©nam", tags.title)
                         tags.artist?.let { item("©ART", it) }
+                        tags.cover?.let { cover(it.jpeg) }
                     }
                 }
             }
@@ -203,6 +204,15 @@ internal class M4aWriter(
             writeInt(1) // UTF-8
             writeInt(0) // no locale
             write(text.toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    /** The cover item holding a JPEG picture. */
+    private fun DataOutputStream.cover(jpeg: ByteArray) = box("covr") {
+        box("data") {
+            writeInt(13) // JPEG
+            writeInt(0) // no locale
+            write(jpeg)
         }
     }
 

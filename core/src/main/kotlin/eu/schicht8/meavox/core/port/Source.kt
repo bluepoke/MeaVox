@@ -30,7 +30,10 @@ data class SourceCandidate(
     /** Who published it (e.g. the channel); often, but not always, the artist. */
     val artist: String?,
     val durationMs: Long?,
+    /** A small picture of the item, for a list row. */
     val thumbnailUrl: String? = null,
+    /** The largest picture of the item there is, which becomes the Track's Cover Art (#42). */
+    val coverUrl: String? = null,
 )
 
 /**

@@ -20,6 +20,7 @@ import eu.schicht8.meavox.core.port.SeparationProgress
 import eu.schicht8.meavox.core.session.BackingAudio
 import eu.schicht8.meavox.core.session.Sessions
 import eu.schicht8.meavox.core.testing.FakeAudioEngine
+import eu.schicht8.meavox.core.testing.FakeCoverArtLoader
 import eu.schicht8.meavox.core.testing.FakeLocalFile
 import eu.schicht8.meavox.core.testing.FakeLoudnessMeter
 import eu.schicht8.meavox.core.testing.FakePipelineJobs
@@ -45,7 +46,7 @@ class TrackPipelineTest {
     private val tracks = InMemoryTrackRepository()
     private val files = InMemoryTrackFiles()
     private val jobs = FakePipelineJobs()
-    private val import = ImportLocalFile(tracks, files)
+    private val import = ImportLocalFile(tracks, files, FakeCoverArtLoader())
     private val fast = SeparationModelId("fast")
     private val youtube = SourceId("youtube")
     private val medium = SeparationModelId("medium")
